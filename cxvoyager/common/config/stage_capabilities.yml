@@ -1,0 +1,385 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Draft stage capability catalogue for CXVoyager deployment workflow.
+# Generated: 2025-09-30
+# 本文件描述各阶段可复用的上下文数据与阶段依赖关系，供编排器及前端参考。
+
+version: 1  # 配置结构的版本号，更新字段结构时需递增。
+context_keys:
+  # RunContext 中允许被阶段读写的键列表，描述其含义与产生者。
+  plan:
+    description: 解析后的 `PlanModel`，对应部署规划表。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - prepare
+  config:
+    description: 从 YAML 配置及环境变量覆盖合并得到的有效配置对象。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - prepare
+  parsed_plan:
+    description: 缓存的原始规划表分段字典，供后续复用。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - prepare
+      - config_cluster
+  precheck_report:
+    description: 准备阶段生成的依赖与 IP 预检查结果。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - prepare
+  host_scan:
+    description: 通过 SmartX API 或模拟数据获取的主机清单。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - init_cluster
+      - cluster_state_probe
+  deploy_payload:
+    description: 基于规划与主机扫描结果生成的集群部署负载。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - init_cluster
+  deploy_response:
+    description: 集群部署 API 返回的初始响应体。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - init_cluster
+  deploy_verify:
+    description: 用于确认集群部署进度/状态的校验快照。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - init_cluster
+  cluster_ready:
+    description: 标识目标集群是否可达并已就绪的状态标记/元数据。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - init_cluster
+      - cluster_state_probe
+  cloudtower_token:
+    description: 从 CloudTower / Fisheye 获取的后续阶段所需访问令牌。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - cluster_state_probe
+      - config_cluster
+  cloudtower_upload:
+    description: CloudTower ISO 上传摘要（镜像/卷标识、校验信息等）。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - deploy_cloudtower
+  attach_summary:
+    description: 已部署集群回接 CloudTower 的结果摘要。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - attach_cluster
+  cloudtower_configuration:
+    description: 部署后执行的 CloudTower 配置动作汇总。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - cloudtower_config
+  inspection_report:
+    description: 导出的巡检工件及汇总指标。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - check_cluster_healthy
+  deploy_result:
+    description: 部署提交与轮询流程的最终结果。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - deploy_obs
+      - deploy_bak
+      - deploy_er
+      - deploy_sfs
+      - deploy_sks
+  deploy_results:
+    description: 按应用缩写聚合的上传结果字典。
+    populated_by:
+      - deploy_obs
+      - deploy_bak
+      - deploy_er
+      - deploy_sfs
+      - deploy_sks
+  deploy_obs_result:
+    description: OBS 应用上传结果。
+    populated_by:
+      - deploy_obs
+  deploy_bak_result:
+    description: BAK 应用上传结果。
+    populated_by:
+      - deploy_bak
+  deploy_er_result:
+    description: ER 应用上传结果。
+    populated_by:
+      - deploy_er
+  deploy_sfs_result:
+    description: SFS 应用上传结果。
+    populated_by:
+      - deploy_sfs
+  deploy_sks_result:
+    description: SKS 应用上传结果。
+    populated_by:
+      - deploy_sks
+  test_vm_plan:
+    description: 为验证用途规划的基准/测试虚拟机定义。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - create_test_vms
+  perf_report:
+    description: 从测试虚拟机收集的性能与可靠性模拟结果。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - perf_reliability
+  cleanup_bundle:
+    description: 清理阶段生成的归档/总结文件路径。
+    # 生成该上下文值的阶段名称列表。
+    populated_by:
+      - cleanup
+
+stages:
+  # 定义可执行阶段或探针以及它们的依赖、产出与描述。
+  prepare:
+    order: 1  # 阶段执行顺序的权重，数字越小越早执行。
+    label: "准备与规划校验"  # 供前端展示的中文名称。
+    type: stage  # 标识为正式阶段(stage)或探针(probe)。
+    requires: []  # 启动该阶段前必须存在的上下文键列表。
+    optional_requires: []  # 可选依赖，缺失时阶段可根据策略降级处理。
+    produces:
+      - plan
+      - config
+      - parsed_plan
+      - precheck_report
+    notes: >-  # 阶段的文字说明与实现备注。
+      查找并解析部署规划表，完成结构校验、依赖检查与基础 IP 预检，生成基础配置与命令行选项。
+
+  init_cluster:
+    order: 2  # 阶段执行顺序的权重，数字越小越早执行。
+    label: "初始化集群"  # 供前端展示的中文名称。
+    type: stage  # 标识为正式阶段(stage)或探针(probe)。
+    requires:
+      - plan
+      - config
+    optional_requires:
+      - parsed_plan
+    produces:
+      - host_scan
+      - deploy_payload
+      - deploy_response
+      - deploy_verify
+      - cluster_ready
+    notes: >-
+      扫描主机、构建部署负载、调用 SmartX 部署 API 并轮询确认结果，输出主机清单与部署校验信息。
+
+  cluster_state_probe:
+    order: 2.5  # 阶段执行顺序的权重，适用于探针时允许非整数。
+    label: "复用已部署集群探针"  # 供前端展示的中文名称。
+    type: probe  # 标识为探针，用于补充上下文而非主要阶段。
+    auto_inject_for:
+      # 需要该探针自动插入的阶段名称列表。
+      - deploy_cloudtower
+      - config_cluster
+    requires:
+      - plan
+      - config
+    optional_requires:
+      - parsed_plan
+      - host_scan
+    produces:
+      - host_scan
+      - cluster_ready
+      - cloudtower_token
+    notes: >-
+      在跳过 init_cluster 时执行轻量探针，确认现有集群/CloudTower 端点可达，可必要时生成最小化主机扫描结果并获取后续阶段需要的认证令牌。
+
+  config_cluster:
+    order: 3  # 阶段执行顺序的权重，数字越小越早执行。
+    label: "集群配置"  # 供前端展示的中文名称。
+    type: stage  # 标识为正式阶段(stage)或探针(probe)。
+    requires:
+      - plan
+      - config
+      - host_scan
+      - deploy_verify
+    optional_requires:
+      - parsed_plan
+      - cloudtower_token
+    produces:
+      - cloudtower_token
+      - cluster_ready
+    notes: >-
+      应用集群基础配置（VIP、DNS、NTP、IPMI、网络等），并获取 CloudTower/Fisheye 会话令牌供后续接口调用使用。
+
+  deploy_cloudtower:
+    order: 4  # 阶段执行顺序的权重，数字越小越早执行。
+    label: "部署 CloudTower"  # 供前端展示的中文名称。
+    type: stage  # 标识为正式阶段(stage)或探针(probe)。
+    requires:
+      - config
+      - host_scan
+      - cluster_ready
+    optional_requires:
+      - plan
+      - cloudtower_token
+    produces:
+      - cloudtower_upload
+      - cluster_ready
+    notes: >-
+      解析 ISO 工件、创建上传卷、分片流式上传 ISO 并记录摘要供后续阶段使用，默认前提是集群端点可访问。
+
+  attach_cluster:
+    order: 5  # 阶段执行顺序的权重，数字越小越早执行。
+    label: "接入 CloudTower"  # 供前端展示的中文名称。
+    type: stage  # 标识为正式阶段(stage)或探针(probe)。
+    requires:
+      - plan
+      - cloudtower_upload
+    optional_requires:
+      - cloudtower_token
+    produces:
+      - attach_summary
+    notes: >-
+      在 CloudTower 中登记新部署的集群，目前实现为占位逻辑，仅记录模拟的接入结果元数据。
+
+  cloudtower_config:
+    order: 6  # 阶段执行顺序的权重，数字越小越早执行。
+    label: "CloudTower 配置"  # 供前端展示的中文名称。
+    type: stage  # 标识为正式阶段(stage)或探针(probe)。
+    requires:
+      - cloudtower_upload
+    optional_requires:
+      - cloudtower_token
+      - attach_summary
+    produces:
+      - cloudtower_configuration
+    notes: >-
+      执行部署后的 CloudTower 配置（NTP/DNS/策略等），当前为模拟实现，后续版本应使用前面阶段获取的 CloudTower 令牌。
+
+  check_cluster_healthy:
+    order: 7  # 阶段执行顺序的权重，数字越小越早执行。
+    label: "集群巡检"  # 供前端展示的中文名称。
+    type: stage  # 标识为正式阶段(stage)或探针(probe)。
+    requires:
+      - deploy_payload
+    optional_requires:
+      - cloudtower_configuration
+    produces:
+      - inspection_report
+    notes: >-
+      通过 CloudTower 巡检中心执行健康检查并导出报告（含 ZIP）。
+
+  deploy_obs:
+    order: 8
+    label: "部署 OBS"
+    type: stage
+    requires:
+      - plan
+      - config
+    optional_requires:
+      - deploy_payload
+      - cloudtower_token
+    produces:
+      - deploy_result
+      - deploy_results
+      - deploy_obs_result
+    notes: >-
+      上传 Observability 包到 /api/ovm-operator/api/v3/chunkedUploads，支持 dry-run 预览但无 mock。
+
+  deploy_bak:
+    order: 9
+    label: "部署 BAK"
+    type: stage
+    requires:
+      - plan
+      - config
+    optional_requires:
+      - deploy_payload
+      - cloudtower_token
+    produces:
+      - deploy_result
+      - deploy_results
+      - deploy_bak_result
+    notes: >-
+      上传 Backup 包到 /api/ovm-operator/api/v3/chunkedUploads，支持 dry-run 预览但无 mock。
+
+  deploy_er:
+    order: 10
+    label: "部署 ER"
+    type: stage
+    requires:
+      - plan
+      - config
+    optional_requires:
+      - deploy_payload
+      - cloudtower_token
+    produces:
+      - deploy_result
+      - deploy_results
+      - deploy_er_result
+    notes: >-
+      上传 ER 包到 /api/ovm-operator/api/v3/chunkedUploads，支持 dry-run 预览但无 mock。
+
+  deploy_sfs:
+    order: 11
+    label: "部署 SFS"
+    type: stage
+    requires:
+      - plan
+      - config
+    optional_requires:
+      - deploy_payload
+      - cloudtower_token
+    produces:
+      - deploy_result
+      - deploy_results
+      - deploy_sfs_result
+    notes: >-
+      上传 SFS 包到 /api/ovm-operator/api/v3/chunkedUploads，支持 dry-run 预览但无 mock。
+
+  deploy_sks:
+    order: 12
+    label: "部署 SKS"
+    type: stage
+    requires:
+      - plan
+      - config
+    optional_requires:
+      - deploy_payload
+      - cloudtower_token
+    produces:
+      - deploy_result
+      - deploy_results
+      - deploy_sks_result
+    notes: >-
+      上传 SKS 包到 /api/ovm-operator/api/v3/chunkedUploads，支持 dry-run 预览但无 mock。
+
+  create_test_vms:
+    order: 13  # 阶段执行顺序的权重，数字越小越早执行。
+    label: "创建测试虚机"  # 供前端展示的中文名称。
+    type: stage  # 标识为正式阶段(stage)或探针(probe)。
+    requires:
+      - deploy_payload
+    optional_requires: []  # 可选依赖，缺失时阶段可根据策略降级处理。
+    produces:
+      - test_vm_plan
+    notes: >-
+      基于部署负载特征规划验证用虚拟机，当前为模拟实现，仅记录计划的虚拟机布局而不实际创建。
+
+  perf_reliability:
+    order: 14  # 阶段执行顺序的权重，数字越小越早执行。
+    label: "性能压测"  # 供前端展示的中文名称。
+    type: stage  # 标识为正式阶段(stage)或探针(probe)。
+    requires:
+      - test_vm_plan
+    optional_requires: []  # 可选依赖，缺失时阶段可根据策略降级处理。
+    produces:
+      - perf_report
+    notes: >-
+      根据测试虚拟机计划执行（模拟）性能与可靠性验证，收集并存储聚合指标用于报告。
+
+  cleanup:
+    order: 15  # 阶段执行顺序的权重，数字越小越早执行。
+    label: "收尾清理"  # 供前端展示的中文名称。
+    type: stage  # 标识为正式阶段(stage)或探针(probe)。
+    requires: []  # 启动该阶段前必须存在的上下文键列表。
+    optional_requires: []  # 可选依赖，缺失时阶段可根据策略降级处理。
+    produces:
+      - cleanup_bundle
+    notes: >-
+      收集工件与日志、写入运行总结，并生成归档包便于交付。

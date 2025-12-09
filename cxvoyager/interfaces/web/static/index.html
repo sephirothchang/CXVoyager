@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CXVoyager 自动化部署控制台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/x-icon" href="/resources/icon.ico" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar" aria-label="主导航">
+        <div class="topbar__brand">
+          <img src="/resources/CXVoyager.png" alt="CXVoyager Logo" class="topbar__logo" />
+        </div>
+        <nav class="topbar__nav">
+          <a href="#hero" class="topbar__button topbar__button--ghost topbar__button--active" data-view-link="home">首页</a>
+          <a href="#wizard" class="topbar__button" data-view-link="wizard">开始部署</a>
+          <a href="#tasks-section" class="topbar__button topbar__button--ghost" data-view-link="tasks">任务列表</a>
+        </nav>
+      </header>
+
+      <main class="view-container">
+        <section class="hero-section view view--home" data-view="home" id="hero">
+          <div class="hero-section__content">
+          <span class="hero-section__badge">CXVoyager Web Console</span>
+          <h1>自动化部署 · 三步即达</h1>
+          <p>
+            依次完成三个步骤，选择部署阶段、配置运行选项，然后启动并可视化跟踪。
+          </p>
+          <div class="hero-section__actions">
+            <a href="#wizard" class="hero-button hero-button--primary hero-button--xl" data-view-link="wizard">立即开始</a>
+          </div>
+          <dl class="hero-metrics" role="list">
+            <div class="hero-metrics__item">
+              <dt><span id="stage-count">--</span> 个可选阶段</dt>
+              <dd>覆盖部署全流程</dd>
+            </div>
+            <div class="hero-metrics__item">
+              <dt>3 项功能开关</dt>
+              <dd>灵活控制运行策略</dd>
+            </div>
+            <div class="hero-metrics__item">
+              <dt>实时日志与进度</dt>
+              <dd>随时掌握执行态势</dd>
+            </div>
+          </dl>
+          </div>
+
+          <aside class="hero-section__panel" aria-labelledby="summary-title">
+            <div class="wizard-summary">
+              <span class="wizard-summary__badge">快速了解</span>
+              <h2 id="summary-title">三个步骤即可启动部署</h2>
+              <p class="wizard-summary__lead">无需复杂配置，只需完成以下三步即可启动自动化任务。</p>
+              <ol class="wizard-summary__steps">
+                <li>
+                  <strong>选择部署阶段</strong>
+                  <span>勾选需要执行的自动化阶段。</span>
+                </li>
+                <li>
+                  <strong>配置运行选项</strong>
+                  <span>按需切换模拟运行、严格模式与调试日志。</span>
+                </li>
+                <li>
+                  <strong>启动并跟踪</strong>
+                  <span>提交后实时查看执行状态与日志。</span>
+                </li>
+              </ol>
+            </div>
+          </aside>
+        </section>
+
+        <section class="wizard-section view" data-view="wizard" id="wizard" aria-labelledby="wizard-title" hidden>
+          <div class="wizard-shell" id="deployment-card">
+            <div class="wizard-card__header">
+              <span class="wizard-card__badge">引导步骤 1/3</span>
+              <h2 id="wizard-title">部署引导</h2>
+              <p>依次完成三个步骤，然后启动部署并跟踪任务。</p>
+            </div>
+            <nav class="flow-stepper" aria-label="步骤导航">
+              <button type="button" class="flow-step flow-step--active" data-step="1" data-target="stage-section">
+                <span class="flow-step__index">1</span>
+                <span class="flow-step__content">
+                  <strong>选择部署阶段</strong>
+                  <small>勾选需要执行的自动化阶段</small>
+                </span>
+              </button>
+              <button type="button" class="flow-step" data-step="2" data-target="options-section">
+                <span class="flow-step__index">2</span>
+                <span class="flow-step__content">
+                  <strong>配置运行选项</strong>
+                  <small>按需切换模拟运行与严格模式</small>
+                </span>
+              </button>
+              <button type="button" class="flow-step" data-step="3" data-target="tasks-section">
+                <span class="flow-step__index">3</span>
+                <span class="flow-step__content">
+                  <strong>启动并跟踪</strong>
+                  <small>提交后实时查看进度</small>
+                </span>
+              </button>
+            </nav>
+
+            <section class="wizard-panel" id="stage-section" aria-labelledby="stage-title">
+              <div class="wizard-panel__header">
+                <h3 id="stage-title">选择部署阶段</h3>
+                <p>选择要包含的部署阶段：</p>
+              </div>
+              <div id="stage-grid" class="stage-grid" aria-live="polite"></div>
+            </section>
+
+            <section class="wizard-panel" id="options-section" aria-labelledby="options-title">
+              <div class="wizard-panel__header">
+                <h3 id="options-title">配置运行选项</h3>
+                <p>按需启用模拟运行、严格验证与调试日志。</p>
+              </div>
+              <div class="option-list">
+                <label class="switch">
+                  <input type="checkbox" id="opt-dry-run" />
+                  <span class="switch__slider"></span>
+                  <span class="switch__label">仅模拟运行</span>
+                </label>
+                <label class="switch">
+                  <input type="checkbox" id="opt-strict" />
+                  <span class="switch__slider"></span>
+                  <span class="switch__label">严格验证（警告即失败）</span>
+                </label>
+                <label class="switch">
+                  <input type="checkbox" id="opt-debug" />
+                  <span class="switch__slider"></span>
+                  <span class="switch__label">调试日志</span>
+                </label>
+              </div>
+              <div class="wizard-panel__actions">
+                <button id="deploy-btn" class="primary-btn">启动自动化部署</button>
+                <p id="form-hint" class="card__hint"></p>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="tasks-section view" data-view="tasks" id="tasks-section" aria-labelledby="tasks-title" hidden>
+          <div class="tasks-section__header">
+        <h2 id="tasks-title">任务跟踪中心</h2>
+        <p>最新任务会自动出现在列表中，可查看阶段完成情况与预检摘要。</p>
+      </div>
+          <section class="progress-board" aria-label="全阶段最新进展">
+            <div class="progress-board__header">
+              <h3>全阶段最新进展</h3>
+              <p>展示 info、warning、error 级别的实时日志，便于快速了解执行态势。</p>
+            </div>
+            <div class="progress-board__body">
+              <div id="global-progress" class="progress-board__feed" aria-live="polite"></div>
+            </div>
+          </section>
+      <div class="tasks-section__toolbar" role="toolbar" aria-label="任务筛选">
+        <label for="task-filter">状态筛选</label>
+        <select id="task-filter" class="task-filter">
+          <option value="all">全部</option>
+          <option value="pending">等待调度</option>
+          <option value="running">执行中</option>
+          <option value="done">已完成</option>
+          <option value="failed">执行失败</option>
+          <option value="aborted">已中止</option>
+        </select>
+      </div>
+      <div id="task-list" class="task-list" aria-live="polite"></div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+    <script type="module" src="/assets/app.js"></script>
+  </body>
+</html>

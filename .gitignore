@@ -1,0 +1,42 @@
+# Logs
+logs/
+*.log
+
+# docs
+docs/
+
+# Development helper utilities
+开发辅助工具-忽略且无需处理/
+
+# Generated examples and demo payloads
+示例文件/
+示例_DiskStation_Sep-26-2320-2025_LocalTypeConflict/
+
+# Release artifacts
+release/
+
+# Planning spreadsheets
+~$*.xlsx
+05.【模板】SmartX超融合核心平台规划设计表-ELF环境-v20250820.xlsx
+
+# Virtual environments and caches
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Local python packaging outputs
+build/
+dist/
+*.egg-info/
+
+# 测试的生成文件
+artifacts/
+artifacts/deploy_*.json
+artifacts/bundle*.tar.gz
+artifacts/*.json
+
+# 安装介质文件
+*.iso
+*.img
+*.zip
+*.tar.gz
