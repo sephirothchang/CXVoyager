@@ -2,11 +2,6 @@
 logs/
 *.log
 
-# docs
-docs/
-
-# Development helper utilities
-开发辅助工具-忽略且无需处理/
 
 # Generated examples and demo payloads
 示例文件/
@@ -17,7 +12,7 @@ release/
 
 # Planning spreadsheets
 ~$*.xlsx
-05.【模板】SmartX超融合核心平台规划设计表-ELF环境-v20250820.xlsx
+*.xlsx
 
 # Virtual environments and caches
 .venv/
