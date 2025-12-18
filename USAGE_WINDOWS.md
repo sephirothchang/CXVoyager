@@ -43,4 +43,5 @@ powershell -ExecutionPolicy Bypass -File .\start.ps1
 - 如遇权限问题，请以管理员权限运行 PowerShell（右键 PowerShell → 以管理员身份运行）。
 
 ## 其他
-- MACOS 或 Linux 用户请参阅 `USAGE_MACOS_Linux.md`。
+- Linux 用户请参阅 `USAGE_LINUX.md`。
+- macOS 用户请参阅 `USAGE_MACOS.md`。
