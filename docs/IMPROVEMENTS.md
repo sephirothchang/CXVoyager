@@ -7,6 +7,7 @@
 ## 解析与验证
 - [x] prepare 阶段缓存原始 parsed 数据（含 `_derived_network`）避免重复解析。
 - [x] CloudTower-only 模式允许集群 VIP 存活，并通过 Fisheye 登录验证现有集群服务状态。
+- [x] 管理信息解析容忍 NTP/DNS FQDN，失败时降级为空 mgmt 并记录 warning（不阻断后续阶段）。
 - [ ] 严格模式：将若干 warnings 在 strict 模式下提升为 errors。
 - [ ] 增加 IPv4/IPv6 混合下的网段冲突与跨段分布检查。
 - [ ] VIP 与所有主机地址、存储地址、网络网关冲突全面校验。
@@ -19,6 +20,7 @@
 - [ ] SSD/NVMe 性能排序与缓存优先策略（加权容量/IOPS）。
 
 ## API 交互
+- [x] CloudTower 上传前强制执行实时登录获取新 token，base_url 分辨顺序：显式配置 -> deploy_cloudtower 输出 -> PlanModel mgmt -> parsed_plan mgmt。
 - [ ] 真实 API 认证流程（Token刷新 / 会话保持 / TLS 校验）。
 - [ ] 区分可重试与不可重试错误（HTTP 4xx vs 5xx）。
 - [ ] 部署任务事件流订阅（WebSocket / SSE）替代轮询。

@@ -28,6 +28,30 @@ python -m cxvoyager.command_line_interface scan
 python -m cxvoyager.command_line_interface deploy --mock
 ```
 
+## 工作流概览
+本项目的阶段式工作流概览与各阶段详细设计请参阅：
+
+- `docs/WORKFLOW_OVERVIEW.md`：整体阶段顺序、依赖与执行要点。
+- `docs/Step_01-PREPARE_PLAN_SHEET.md` … `docs/Step_15-CLEANUP.md`：每个阶段的详细设计文档。
+
+快速打开（项目根）：
+```powershell
+notepad docs\WORKFLOW_OVERVIEW.md
+```
+
+其他参考：
+
+- `docs/WORKFLOW_FLOW.md`：Mermaid 流程图（可视化阶段顺序）。
+- `docs/INDEX.md`：阶段索引（每阶段一行摘要，便于快速定位）。
+
+### 规划表快速预览
+```bash
+# 优先读取项目根目录规划表，支持指定路径
+python scripts/plan_preview.py                 # 自动在项目根目录查找
+python scripts/plan_preview.py ./my_plan.xlsx  # 指定规划表路径
+```
+输出包含规划表路径、虚拟网络/主机/管理信息条目数，以及 mgmt 示例与 PlanModel.mgmt 展开，方便快速核对解析结果。
+
 ### 准备阶段 (prepare) 详细说明
 执行 `prepare` 阶段时当前实现会完成以下动作（只读取规划表与进行环境/网络探测，不会对集群或主机做变更）：
 
@@ -38,7 +62,8 @@ python -m cxvoyager.command_line_interface deploy --mock
 	- 必须存在至少 1 条主机记录；
 	- 同一 IP 不允许在管理/存储地址表中重复；
 	- 绑定模式非空时需在允许集合：active-backup / balance-tcp / balance-slb；
-	- 管理平台核心字段缺失会记录为警告（当前策略：不立即失败，后续阶段可再强化）。
+	- 管理平台核心字段缺失会记录为警告（当前策略：不立即失败，后续阶段可再强化）；NTP/DNS 支持 IP 或 FQDN。
+	- 若 mgmt 解析异常会降级为空 mgmt 并记录 warning，避免阻断其他阶段。
 5. 可选依赖检查：检测如 openpyxl / requests / tenacity / fastapi 等模块是否已安装；缺失项在报告中列出，默认仅警告（后续可切换为强制失败）。
 6. 网络连通性：
 	- ICMP：对每台主机管理地址执行 ping；
@@ -84,7 +109,8 @@ type .\logs\cxvoyager.log | more
 1. 按阶段名称自动搜索对应包（如 deploy_obs 查找 `Observability-X86_64-*.tar.gz`，deploy_bak 查找 `Backup-X86_64-*.tar.gz`）。
 2. --dry-run 下仅记录即将调用的 base_url、endpoint 与包名，不实际发起请求（无 mock）。
 3. 非 dry-run 时向 `POST /api/ovm-operator/api/v3/chunkedUploads` 提交 `{origin_file_name: <包名>}`，需要 Bearer 令牌。
-4. 上传基址优先读取 `api.<abbr>_base_url`（如 `obs_base_url` / `bak_base_url` 等，若缺省则回退 `api.base_url`，仍空则取首台主机管理地址，默认 https）。
+4. CloudTower 上传基址分辨顺序：`api.cloudtower_base_url` > `api.base_url` > deploy_cloudtower 阶段输出 > PlanModel.mgmt 中的 CloudTower IP > parsed_plan mgmt，默认 https。
+5. 每次上传前都会调用 `cloudtower_login` 获取全新 token，不复用旧会话，减少冲突。
 5. 结果写入 `ctx.extra['deploy_results'][<abbr>]`，并镜像到 `deploy_<abbr>_result`。 
 
 ### 新增 CLI 选项
