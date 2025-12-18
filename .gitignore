@@ -40,4 +40,4 @@ artifacts/*.json
 *.iso
 *.img
 *.zip
-*.tar.gz
+Observability*.tar.gz

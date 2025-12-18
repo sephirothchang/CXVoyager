@@ -4,6 +4,26 @@
 
 使用现有的集群规划表作为信息来源，自动完成SMTX集群的部署和配置工作，极大地简化了部署流程，减少人为错误，提高部署效率。该工具涵盖从集群初始化、配置、Cloudtower部署与关联、集群配置、巡检、测试虚拟机创建到性能与可靠性测试等多个阶段，确保集群能够快速稳定地上线运行。
 
+# 快速开始
+- Windows：双击或在 PowerShell 运行 `start-windows.ps1`
+- macOS：双击或在终端运行 `start-macos.command`
+- Linux：`chmod +x start-linux.sh && ./start-linux.sh`
+- SMTXOS（便携 Python，英文界面）：`chmod +x start-smtxos.sh && ./start-smtxos.sh`（详见 [USAGE_SMTXOS.md](USAGE_SMTXOS.md)）
+
+# 运行要求
+- Python 3.9+（SMTXOS 启动器会自动解压便携版 Python 3.10 并使用）
+- 规划表置于项目根目录，文件名包含固定关键字“SmartX超融合”“规划设计表”“ELF环境”
+- 无外网场景可提前准备离线包到 `cxvoyager/common/resources/offline_packages/`，或运行 `scripts/prepare_offline_installation_packages.py` 在有网环境下载
+
+# CLI 常用命令
+- `python -m cxvoyager` 或直接运行启动脚本进入交互主菜单
+- `parse`：解析规划表
+- `check --no-scan`：解析并校验（可跳过主机扫描）
+- `run --stages prepare,deploy_obs --dry-run`：按阶段执行，支持 dry-run/strict/debug 开关
+- `deploy`：交互选择阶段并执行
+- `stages-list`：列出阶段信息
+- 语言切换：设置环境变量 `CXVOYAGER_LANG=en_US` 可显示英文（start-smtxos.sh 已默认设置）
+
 # 自动部署工作流
 
 ## 第零阶段 准备工作
@@ -11,7 +31,7 @@
 2. 确保所有目标主机已经连接到网络，并自动验证网络连通性、端口可达性。
 3. 检查本地依赖环境，确保Python及所需库已安装。
 
-## 第一阶段 SMTX 集群初始化
+## 第一阶段 集群初始化（init_cluster）
 1. 读取现有的Excel表格，解析其中的部署相关信息。
 2. 根据表格中的主机IP地址，对每台主机进行扫描，获取必要的信息。
    解析网卡信息，选择具有IPv6地址的网卡用于填充部署载荷中的"host_ip"字段。
@@ -33,7 +53,7 @@
 * 已提供 dry-run 部署提交阶段：使用 `python -m cxvoyager.interfaces.cli run --stages prepare,init_cluster,deploy_obs --dry-run` 预览载荷（其他应用可按需选择 deploy_bak/deploy_er/deploy_sfs/deploy_sks）。
 * 非 dry-run 时会模拟提交并轮询状态（mock 模式下生成示例回显）。
 
-## 第二阶段 SMTX 集群配置
+## 第二阶段 集群配置（config_cluster）
 1. 读取现有的Excel表格，解析其中的配置相关信息。
 2. 配置fisheye管理员密码
 3. 配置集群VIP
@@ -42,9 +62,9 @@
 6. （可选）上传VMtools工具、cloudinit ISO 镜像
 7. 配置机架信息
 
-> 设计细节可参考《[config_cluster 阶段设计](docs/CONFIG_CLUSTER_DESIGN.md)》，内含 VMTools 上传（可按需执行）、业务网络创建、序列号回填等完整流程说明。
+> 设计细节可参考《[config_cluster 阶段设计](docs/CONFIG_CLUSTER_DESIGN.md)》，内含 SVT 上传（可按需执行）、业务网络创建、序列号回填等完整流程说明。
 
-## 第三阶段 Cloudtower部署
+## 第三阶段 部署 CloudTower（deploy_cloudtower）
 1. 读取现有的Excel表格，解析其中的Cloudtower部署相关信息。
 2. 上传Cloudtower 安装介质（iso或tar包）
 3. 部署Cloudtower
@@ -52,11 +72,11 @@
 
 > 设计细节与接口对接可参考《[CloudTower 部署设计](docs/CLOUDTOWER_DEPLOYMENT_DESIGN.md)》，其中涵盖 ISO 上传、虚拟机创建、自动化脚本与失败回滚方案。
 
-## 第四阶段 关联集群
+## 第四阶段 接入 CloudTower（attach_cluster）
 1. 读取现有的Excel表格，解析其中的集群信息
 2. 使用第二阶段配置的集群VIP地址和fisheye管理员密码关联Cloudtower
 
-## 第五阶段 Cloudtower集群配置
+## 第五阶段 CloudTower 配置（cloudtower_config）
 1. 读取现有的Excel表格，解析其中的Cloudtower集群配置相关信息
 2. 配置Cloudtower的ntp和dns
 3. 配置集群默认存储策略为2副本
@@ -64,31 +84,30 @@
 5. 配置监控面板
 6. 配置告警
 
-## 第六阶段 巡检和信息导出
+## 第六阶段 集群巡检（check_cluster_healthy）
 1. 使用Cloudtower巡检中心接口，对集群进行巡检
 2. 导出并下载巡检报告及cluster-info.json
 3. 收集集群序列号写入excel表格
 4. 收集Cloudtower序列号写入excel表格
 5. 收集主机序列号写入excel表格
 
-## 第七阶段 部署其他应用
-1. 读取现有的Excel表格，解析其中的其他应用部署相关信息
-2. 提示用户确认其他应用部署信息
-3. 部署其他应用（如有）
-4. 配置其他应用相关参数
+## 第七阶段 部署业务应用
+1. 读取规划表中的业务应用部署信息
+2. 部署并登记 OBS / BAK / ER / SFS / SKS 等组件
+3. 应用业务配置参数
 
-## 第八阶段 创建测试虚拟机
+## 第八阶段 创建测试虚机（create_test_vms）
 1. 读取现有的Excel表格，解析其中的测试虚拟机相关信息
 2. 导入ovf模板，SMTX-FIO虚拟机及SMTX-PAT虚拟机
 3. 克隆测试虚拟机，全闪或nvme缓存盘则每台主机2个fio测试虚拟机，混合每台主机1个
 4. 配置测试虚拟机网络
 5. 启动测试虚拟机
 
-## 第九阶段 性能测试与可靠性测试
+## 第九阶段 性能与可靠性（perf_reliability）
 1. 使用SMTX-FIO测试虚拟机进行性能测试
 2. 提示用户进行可靠性测试
 
-## 第十阶段 清理工作
+## 第十阶段 收尾清理（cleanup）
 1. 关闭测试虚拟机
 2. 提示用户批量修改主机root密码和smartx用户密码
 3. 提示用户修改Cloudtower管理员密码
@@ -157,7 +176,7 @@
 - 如目录为空，说明下载步骤未生效，可重新运行准备脚本并检查输出日志。
 
 
-# Copilot提示词与需要做的事项
+# 需要做的事项
 这是一个用于自动化部署SmartX环境及应用的工具，使用python语言编写，实现以下目标：
 1. 整体部署工作流如上所示，模块化设计，确保模块之间相对解耦，组合实现每个阶段对应的功能
 2. 集群规划表位于工具同一目录下，名称类似为“05.【模板】SmartX超融合核心平台规划设计表-ELF环境-v20250820.xlsx”，其中模板可能为客户名称，version可能会变化，但是中间的关键词“SmartX超融合”、“规划设计表”和“ELF环境”是固定的，使用模糊匹配的方式定位这个文件作为部署信息来源
