@@ -23,6 +23,9 @@ release/
 __pycache__/
 .pytest_cache/
 
+# vscode settings
+.vscode/
+
 # Local python packaging outputs
 build/
 dist/

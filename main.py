@@ -24,15 +24,26 @@ import sys
 from pathlib import Path
 
 
+def _is_en() -> bool:
+    lang = os.environ.get("CXVOYAGER_LANG", "").lower()
+    return lang.startswith("en")
+
+
+def _t(cn: str, en: str) -> str:
+    return en if _is_en() else cn
+
+
 def _print_menu() -> None:
-    print("\n=== CXVoyager 交互入口 ===")
-    print("1) CLI 模式 (CXVoyager CLI)")
-    print("2) Web UI 模式 (CXVoyager Web Console)")
-    print("3) 安装依赖（离线包）")
-    print("0) 退出")
+    print("\n=== " + _t("CXVoyager 交互入口", "CXVoyager Entry") + " ===")
+    print("1) " + _t("CLI 模式 (CXVoyager CLI)", "CLI Mode (CXVoyager CLI)"))
+    print("2) " + _t("Web UI 模式 (CXVoyager Web Console)", "Web UI Mode (CXVoyager Web Console)"))
+    print("3) " + _t("安装依赖（离线包）", "Install deps (offline)") )
+    print("0) " + _t("退出", "Exit"))
 
 
-def _prompt_choice(prompt: str = "请选择模式: ") -> str:
+def _prompt_choice(prompt: str | None = None) -> str:
+    if prompt is None:
+        prompt = _t("请选择模式: ", "Select mode: ")
     try:
         return input(prompt).strip().lower()
     except EOFError:  # Ctrl+D
@@ -40,27 +51,28 @@ def _prompt_choice(prompt: str = "请选择模式: ") -> str:
 
 
 def _run_cli_shell() -> None:
-    from cxvoyager.command_line_interface import app as cli_app
+    from cxvoyager.interfaces.cli.app import app as cli_app
 
     def invoke_cli(args: list[str]) -> None:
         try:
             cli_app(prog_name="cxvoyager", args=args)
         except SystemExit as exc:  # Typer/Click 会抛出 SystemExit
             if exc.code not in (0, None):
-                print(f"命令以退出码 {exc.code} 结束")
+                print(_t(f"命令以退出码 {exc.code} 结束", f"Command exited with code {exc.code}"))
         except Exception as exc:  # noqa: BLE001
-            print(f"执行命令失败: {exc}")
+            print(_t(f"执行命令失败: {exc}", f"Command failed: {exc}"))
 
-    print("\n欢迎使用 CXVoyager CLI。请输入命令（例如: run --debug），输入 exit 返回主菜单。")
-    print("输入 help 查看指令列表。")
+    print("\n" + _t("欢迎使用 CXVoyager CLI。请输入命令（例如: run --debug），输入 exit 返回主菜单。",
+                      "Welcome to CXVoyager CLI. Type commands (e.g., run --debug); type exit to return."))
+    print(_t("输入 help 查看指令列表。", "Type help to list commands."))
     while True:
         try:
             command = input("cli> ").strip()
         except EOFError:
-            print("\n检测到 EOF，返回主菜单。")
+            print(_t("\n检测到 EOF，返回主菜单。", "\nEOF detected, returning to menu."))
             break
         except KeyboardInterrupt:
-            print("\n已取消当前命令，继续停留在 CLI 模式。")
+            print(_t("\n已取消当前命令，继续停留在 CLI 模式。", "\nCommand canceled; staying in CLI."))
             continue
 
         if not command:
@@ -75,12 +87,12 @@ def _run_cli_shell() -> None:
         try:
             args = shlex.split(command)
         except ValueError as exc:
-            print(f"无法解析命令: {exc}")
+            print(_t(f"无法解析命令: {exc}", f"Cannot parse command: {exc}"))
             continue
 
         invoke_cli(args)
 
-    print("已退出 CLI 交互模式。")
+    print(_t("已退出 CLI 交互模式。", "Exited CLI shell."))
 
 
 def _resolve_port(value: str | None, default: int) -> int:
@@ -110,10 +122,16 @@ def _run_web_ui() -> None:
     host = default_host or "0.0.0.0"
 
     display_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
-    print(f"启动 CXVoyager Web 控制台，监听 {host}:{port}")
-    print(f"本机访问 http://{display_host}:{port} (可设置 CXVOYAGER_WEB_HOST/CXVOYAGER_WEB_PORT 覆盖)")
-    print(f"接口文档 http://{display_host}:{port}/docs")
-    print("按 Ctrl+C 停止服务。")
+    print(_t(
+        f"启动 CXVoyager Web 控制台，监听 {host}:{port}",
+        f"Starting CXVoyager Web Console on {host}:{port}"
+    ))
+    print(_t(
+        f"本机访问 http://{display_host}:{port} (可设置 CXVOYAGER_WEB_HOST/CXVOYAGER_WEB_PORT 覆盖)",
+        f"Access locally: http://{display_host}:{port} (override via CXVOYAGER_WEB_HOST/CXVOYAGER_WEB_PORT)"
+    ))
+    print(_t(f"接口文档 http://{display_host}:{port}/docs", f"API docs: http://{display_host}:{port}/docs"))
+    print(_t("按 Ctrl+C 停止服务。", "Press Ctrl+C to stop."))
     try:
         uvicorn.run(
             "cxvoyager.interfaces.web.web_server:app",
@@ -132,18 +150,27 @@ def _install_offline_dependencies() -> None:
     requirements_file = project_root / "requirements.txt"
 
     if not offline_dir.exists():
-        print(f"离线目录 {offline_dir} 不存在，请先准备离线依赖包。")
+        print(_t(
+            f"离线目录 {offline_dir} 不存在，请先准备离线依赖包。",
+            f"Offline dir {offline_dir} not found; prepare offline packages first."
+        ))
         return
 
     if not any(offline_dir.iterdir()):
-        print(f"离线目录 {offline_dir} 为空，请先执行 scripts/prepare_offline_packages.py 下载依赖。")
+        print(_t(
+            f"离线目录 {offline_dir} 为空，请先执行 scripts/prepare_offline_packages.py 下载依赖。",
+            f"Offline dir {offline_dir} is empty; run scripts/prepare_offline_packages.py to download deps."
+        ))
         return
 
     if not requirements_file.exists():
-        print(f"未找到 {requirements_file}，无法读取依赖列表。")
+        print(_t(
+            f"未找到 {requirements_file}，无法读取依赖列表。",
+            f"requirements file {requirements_file} not found; cannot install deps."
+        ))
         return
 
-    print("开始安装依赖（离线模式）...")
+    print(_t("开始安装依赖（离线模式）...", "Installing dependencies (offline)..."))
     cmd = [
         sys.executable,
         "-m",
@@ -157,9 +184,12 @@ def _install_offline_dependencies() -> None:
     ]
     try:
         subprocess.check_call(cmd)
-        print("依赖安装完成。")
+        print(_t("依赖安装完成。", "Dependencies installed."))
     except subprocess.CalledProcessError as exc:
-        print(f"安装过程失败，退出码 {exc.returncode}。请检查离线包或手动执行上述命令。")
+        print(_t(
+            f"安装过程失败，退出码 {exc.returncode}。请检查离线包或手动执行上述命令。",
+            f"Install failed with exit code {exc.returncode}. Check offline packages or rerun manually."
+        ))
 
 
 def main() -> None:
@@ -189,10 +219,10 @@ def main() -> None:
         elif choice == "install":
             _install_offline_dependencies()
         elif choice == "exit":
-            print("再见！")
+            print(_t("再见！", "Goodbye!"))
             break
         else:
-            print("无效的选择，请重新输入。")
+            print(_t("无效的选择，请重新输入。", "Invalid choice, please retry."))
 
 
 if __name__ == "__main__":  # pragma: no cover

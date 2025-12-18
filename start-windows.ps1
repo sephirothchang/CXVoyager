@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$venvDir = Join-Path $scriptDir ".venv-windows"
+$venvDir = Join-Path $scriptDir ".venv"
 $pythonExe = Join-Path $venvDir "Scripts\python.exe"
 $reqFile = Join-Path $scriptDir "requirements.txt"
 $offlineDir = Join-Path $scriptDir "cxvoyager\common\resources\offline_packages"

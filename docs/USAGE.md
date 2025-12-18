@@ -10,22 +10,22 @@ pip install -r requirements.txt
 ## CLI 示例
 ```bash
 # 解析规划表
-python -m cxvoyager.command_line_interface parse
+python -m cxvoyager.interfaces.cli parse
 
 # 验证规划表
-python -m cxvoyager.command_line_interface check
+python -m cxvoyager.interfaces.cli check
 
 # 执行阶段（自动加载 handlers, 含部署提交dry-run）
-python -m cxvoyager.command_line_interface run --stages prepare,init_cluster,deploy_obs --dry-run
+python -m cxvoyager.interfaces.cli run --stages prepare,init_cluster,deploy_obs --dry-run
 
 # 调试与严格校验示例
-python -m cxvoyager.command_line_interface run --debug --strict-validation
+python -m cxvoyager.interfaces.cli run --debug --strict-validation
 
-# 并发扫描主机（模拟）
-python -m cxvoyager.command_line_interface scan
+# 并发扫描主机
+python -m cxvoyager.interfaces.cli scan
 
-# 模拟部署（构建载荷并调用mock API）
-python -m cxvoyager.command_line_interface deploy --mock
+# 交互选择阶段并执行部署
+python -m cxvoyager.interfaces.cli deploy
 ```
 
 ## 工作流概览
@@ -73,7 +73,7 @@ python scripts/plan_preview.py ./my_plan.xlsx  # 指定规划表路径
 
 运行示例：
 ```bash
-python -m cxvoyager.command_line_interface run --stages prepare
+python -m cxvoyager.interfaces.cli run --stages prepare
 ```
 
 查看结果：
@@ -95,7 +95,7 @@ type .\logs\cxvoyager.log | more
 * 增加可配置的校验严格度（warn / error 模式）。
 * 生成结构化 JSON 报告文件供外部系统消费。
 
-> 提示：若只想单独做验证而不做网络探测，可使用 `python -m cxvoyager.command_line_interface check`，该命令仅解析 + 模型 + 业务规则，不执行依赖与网络检查。
+> 提示：若只想单独做验证而不做网络探测，可使用 `python -m cxvoyager.interfaces.cli check`，该命令仅解析 + 模型 + 业务规则，不执行依赖与网络检查。
 
 ### 集群初始化阶段 (init_cluster)
 1. 并发请求每台主机的硬件/网卡/磁盘信息（mock 模式下自动填充示例）。

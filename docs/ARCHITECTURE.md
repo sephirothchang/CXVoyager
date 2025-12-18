@@ -7,7 +7,6 @@
 ```
 CXVoyager/
 ├── cxvoyager/                # 应用核心包
-│   ├── command_line_interface.py
 │   ├── application_version.py
 │   ├── core/
 │   │   ├── deployment/
@@ -67,9 +66,9 @@ CXVoyager/
 │       │   │   └── system_routes.py
 │       │   └── static/
 │       └── cli/
-│           ├── command_definitions.py
-│           ├── command_handlers.py
-│           └── interactive_prompts.py
+│           ├── app.py
+│           ├── __init__.py
+│           └── __main__.py
 ├── scripts/
 ├── tests/
 ├── docs/

@@ -30,7 +30,7 @@
 当前实现状态：
 * 已实现解析、建模、验证（含CIDR合法性/重叠、VIP冲突、IPv6 VIP与主机不匹配警告、绑定模式映射）。
 * 已实现并发主机扫描（mock回填 ifaces/disks）、IPv6优先选择、磁盘分类、部署载荷构建。
-* 已提供 dry-run 部署提交阶段：使用 `python -m cxvoyager.command_line_interface run --stages prepare,init_cluster,deploy_obs --dry-run` 预览载荷（其他应用可按需选择 deploy_bak/deploy_er/deploy_sfs/deploy_sks）。
+* 已提供 dry-run 部署提交阶段：使用 `python -m cxvoyager.interfaces.cli run --stages prepare,init_cluster,deploy_obs --dry-run` 预览载荷（其他应用可按需选择 deploy_bak/deploy_er/deploy_sfs/deploy_sks）。
 * 非 dry-run 时会模拟提交并轮询状态（mock 模式下生成示例回显）。
 
 ## 第二阶段 SMTX 集群配置
