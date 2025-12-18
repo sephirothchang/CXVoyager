@@ -1,0 +1,1130 @@
+{
+    "data": {
+        "hosts": [
+            {
+                "arch": "x86_64",
+                "cgroup_profile_env": {
+                    "cpu_arch": "x86_64",
+                    "cpu_vendor": "AuthenticAMD",
+                    "deployment_env": null,
+                    "enable_lsm_io_threads_state": null,
+                    "is_hygon_hct": false,
+                    "is_metro": false,
+                    "is_nvme_over_rdma": false,
+                    "is_nvme_over_tcp": false,
+                    "is_rdma": false,
+                    "is_vhost": true,
+                    "is_vmware_by_dmidecode": true,
+                    "memory_total": 134654275584,
+                    "node_role": "master",
+                    "numa_info": {
+                        "numa_nodes": [
+                            {
+                                "cpus": [
+                                    [
+                                        0
+                                    ],
+                                    [
+                                        1
+                                    ],
+                                    [
+                                        2
+                                    ],
+                                    [
+                                        3
+                                    ],
+                                    [
+                                        4
+                                    ],
+                                    [
+                                        5
+                                    ],
+                                    [
+                                        6
+                                    ],
+                                    [
+                                        7
+                                    ],
+                                    [
+                                        8
+                                    ],
+                                    [
+                                        9
+                                    ],
+                                    [
+                                        10
+                                    ],
+                                    [
+                                        11
+                                    ],
+                                    [
+                                        12
+                                    ],
+                                    [
+                                        13
+                                    ],
+                                    [
+                                        14
+                                    ],
+                                    [
+                                        15
+                                    ],
+                                    [
+                                        16
+                                    ],
+                                    [
+                                        17
+                                    ],
+                                    [
+                                        18
+                                    ],
+                                    [
+                                        19
+                                    ],
+                                    [
+                                        20
+                                    ],
+                                    [
+                                        21
+                                    ],
+                                    [
+                                        22
+                                    ],
+                                    [
+                                        23
+                                    ]
+                                ],
+                                "free_mem_mb": 127360,
+                                "id": 0,
+                                "mem_size_mb": 128416
+                            }
+                        ]
+                    },
+                    "partition_total": 0,
+                    "platform": "kvm",
+                    "specified_mem_limits": {},
+                    "vm_min_free_bytes": 46963712,
+                    "zbs_spec": "normal"
+                },
+                "cpu": {
+                    "arch": "x86_64",
+                    "brand": "AMD EPYC 7K62 48-Core Processor",
+                    "cores_per_socket": 24,
+                    "flags": "fpu, vme, de, pse, tsc, msr, pae, mce, cx8, apic, sep, mtrr, pge, mca, cmov, pat, pse36, clflush, mmx, fxsr, sse, sse2, ht, syscall, nx, mmxext, fxsr_opt, pdpe1gb, rdtscp, lm, constant_tsc, rep_good, nopl, tsc_reliable, nonstop_tsc, cpuid, extd_apicid, pni, pclmulqdq, ssse3, fma, cx16, sse4_1, sse4_2, x2apic, movbe, popcnt, aes, xsave, avx, f16c, rdrand, hypervisor, lahf_lm, cmp_legacy, svm, extapic, cr8_legacy, abm, sse4a, misalignsse, 3dnowprefetch, osvw, topoext, ssbd, ibrs, ibpb, vmmcall, fsgsbase, bmi1, avx2, smep, bmi2, rdseed, adx, smap, clflushopt, clwb, sha_ni, xsaveopt, xsavec, xgetbv1, xsaves, clzero, wbnoinvd, arat, npt, svm_lock, nrip_save, vmcb_clean, flushbyasid, decodeassists, umip, rdpid, overflow_recov, succor",
+                    "hz_advertised": "2.4790 GHz",
+                    "hz_advertised_raw": [
+                        2479000000,
+                        0
+                    ],
+                    "logical_cores": 24,
+                    "num_cores": 24,
+                    "physical_cores": 24,
+                    "sockets": 1,
+                    "threads_per_core": 1,
+                    "vendor": "AuthenticAMD"
+                },
+                "disks": [
+                    {
+                        "drive": "nvme0n1",
+                        "function": "cache",
+                        "model": "VMware Virtual NVMe Disk",
+                        "serial": "VMware NVME_0000",
+                        "size": 1759218604032,
+                        "type": "SSD"
+                    },
+                    {
+                        "drive": "nvme0n2",
+                        "function": "cache",
+                        "model": "VMware Virtual NVMe Disk",
+                        "serial": "VMware NVME_0000",
+                        "size": 1759218604032,
+                        "type": "SSD"
+                    },
+                    {
+                        "drive": "sda",
+                        "function": "boot",
+                        "model": "Virtual_disk",
+                        "serial": "6000c2960125b1cf6644339d60586e11",
+                        "size": 515396075520,
+                        "type": "SSD"
+                    },
+                    {
+                        "drive": "sdb",
+                        "function": "data",
+                        "model": "VMware_Virtual_SATA_Hard_Drive",
+                        "serial": "01000000000000000001",
+                        "size": 2199023255552,
+                        "type": "HDD"
+                    },
+                    {
+                        "drive": "sdc",
+                        "function": "data",
+                        "model": "VMware_Virtual_SATA_Hard_Drive",
+                        "serial": "02000000000000000001",
+                        "size": 2199023255552,
+                        "type": "HDD"
+                    },
+                    {
+                        "drive": "sdd",
+                        "function": "data",
+                        "model": "VMware_Virtual_SATA_Hard_Drive",
+                        "serial": "03000000000000000001",
+                        "size": 2199023255552,
+                        "type": "HDD"
+                    },
+                    {
+                        "drive": "sde",
+                        "function": "data",
+                        "model": "VMware_Virtual_SATA_Hard_Drive",
+                        "serial": "04000000000000000001",
+                        "size": 2199023255552,
+                        "type": "HDD"
+                    },
+                    {
+                        "drive": "sdf",
+                        "function": "data",
+                        "model": "VMware_Virtual_SATA_Hard_Drive",
+                        "serial": "05000000000000000001",
+                        "size": 2199023255552,
+                        "type": "HDD"
+                    }
+                ],
+                "distribution": "openeuler",
+                "host_ip": "fe80::250:56ff:feb5:25ba%ens256",
+                "host_uuid": "1f97a2d8-9ac8-11f0-978c-3b1611b8ef4a",
+                "hostname": "node-03",
+                "ifaces": [
+                    {
+                        "hwaddr": "00:50:56:b5:25:ba",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": "fe80::250:56ff:feb5:25ba",
+                        "mtu": 1500,
+                        "name": "ens161",
+                        "pci_slot_name": "0000:04:00",
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": 25000000000,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:87:60",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ens162",
+                        "pci_slot_name": "0000:05:00",
+                        "physical_link_up": false,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:87:ff",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": "fe80::250:56ff:feb5:87ff",
+                        "mtu": 1500,
+                        "name": "ens192",
+                        "pci_slot_name": "0000:0b:00",
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": 10000000000,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:aa:55",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ens194",
+                        "pci_slot_name": "0000:0d:00",
+                        "physical_link_up": false,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:bc:e2",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": "fe80::250:56ff:feb5:bce2",
+                        "mtu": 1500,
+                        "name": "ens224",
+                        "pci_slot_name": "0000:13:00",
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": 10000000000,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:d0:51",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ens225",
+                        "pci_slot_name": "0000:14:00",
+                        "physical_link_up": false,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:7a:bf",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": "fe80::250:56ff:feb5:7abf",
+                        "mtu": 1500,
+                        "name": "ens256",
+                        "pci_slot_name": "0000:1b:00",
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": 25000000000,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:8c:6b",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ens257",
+                        "pci_slot_name": "0000:1c:00",
+                        "physical_link_up": false,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:87:ff",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ovsbr-0trvhtjpy",
+                        "pci_slot_name": null,
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": false
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:bc:e2",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ovsbr-foka63maz",
+                        "pci_slot_name": null,
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": false
+                    },
+                    {
+                        "hwaddr": "0e:b6:d1:88:fd:44",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ovsbr-internal",
+                        "pci_slot_name": null,
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": false
+                    },
+                    {
+                        "hwaddr": "ae:b0:38:03:a0:36",
+                        "ibdev": null,
+                        "ipv4": "169.254.169.254",
+                        "ipv6": "fe80::acb0:38ff:fe03:a036",
+                        "mtu": 1500,
+                        "name": "port-internal",
+                        "pci_slot_name": null,
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": null,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "96:88:73:eb:06:09",
+                        "ibdev": null,
+                        "ipv4": "10.0.20.206",
+                        "ipv6": "fe80::9488:73ff:feeb:609",
+                        "mtu": 1500,
+                        "name": "port-mgt",
+                        "pci_slot_name": null,
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": null,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "3e:90:37:6d:17:58",
+                        "ibdev": null,
+                        "ipv4": "10.0.21.206",
+                        "ipv6": "fe80::3c90:37ff:fe6d:1758",
+                        "mtu": 1500,
+                        "name": "port-storage",
+                        "pci_slot_name": null,
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": null,
+                        "up": true
+                    }
+                ],
+                "ipmi_ip": null,
+                "is_all_flash": false,
+                "is_os_in_raid1": false,
+                "is_os_in_single_disk": true,
+                "patch_version": "P4",
+                "product": "SMTXOS",
+                "sn": "VMware-42 35 93 79 8f e8 73 bc-e8 23 31 16 f3 8a dc e0",
+                "status": "disabled",
+                "version": "6.2.0",
+                "zbs_spec": "normal",
+                "zbs_spec_valid": true
+            },
+            {
+                "arch": "x86_64",
+                "cgroup_profile_env": {
+                    "cpu_arch": "x86_64",
+                    "cpu_vendor": "AuthenticAMD",
+                    "deployment_env": null,
+                    "enable_lsm_io_threads_state": null,
+                    "is_hygon_hct": false,
+                    "is_metro": false,
+                    "is_nvme_over_rdma": false,
+                    "is_nvme_over_tcp": false,
+                    "is_rdma": false,
+                    "is_vhost": false,
+                    "is_vmware_by_dmidecode": true,
+                    "memory_total": 134654275584,
+                    "node_role": "",
+                    "numa_info": {
+                        "numa_nodes": [
+                            {
+                                "cpus": [
+                                    [
+                                        0
+                                    ],
+                                    [
+                                        1
+                                    ],
+                                    [
+                                        2
+                                    ],
+                                    [
+                                        3
+                                    ],
+                                    [
+                                        4
+                                    ],
+                                    [
+                                        5
+                                    ],
+                                    [
+                                        6
+                                    ],
+                                    [
+                                        7
+                                    ],
+                                    [
+                                        8
+                                    ],
+                                    [
+                                        9
+                                    ],
+                                    [
+                                        10
+                                    ],
+                                    [
+                                        11
+                                    ],
+                                    [
+                                        12
+                                    ],
+                                    [
+                                        13
+                                    ],
+                                    [
+                                        14
+                                    ],
+                                    [
+                                        15
+                                    ],
+                                    [
+                                        16
+                                    ],
+                                    [
+                                        17
+                                    ],
+                                    [
+                                        18
+                                    ],
+                                    [
+                                        19
+                                    ],
+                                    [
+                                        20
+                                    ],
+                                    [
+                                        21
+                                    ],
+                                    [
+                                        22
+                                    ],
+                                    [
+                                        23
+                                    ]
+                                ],
+                                "free_mem_mb": 127407,
+                                "id": 0,
+                                "mem_size_mb": 128416
+                            }
+                        ]
+                    },
+                    "partition_total": 0,
+                    "platform": "",
+                    "specified_mem_limits": {},
+                    "vm_min_free_bytes": 46963712,
+                    "zbs_spec": "normal"
+                },
+                "cpu": {
+                    "arch": "x86_64",
+                    "brand": "AMD EPYC 7K62 48-Core Processor",
+                    "cores_per_socket": 24,
+                    "flags": "fpu, vme, de, pse, tsc, msr, pae, mce, cx8, apic, sep, mtrr, pge, mca, cmov, pat, pse36, clflush, mmx, fxsr, sse, sse2, ht, syscall, nx, mmxext, fxsr_opt, pdpe1gb, rdtscp, lm, constant_tsc, rep_good, nopl, tsc_reliable, nonstop_tsc, cpuid, extd_apicid, pni, pclmulqdq, ssse3, fma, cx16, sse4_1, sse4_2, x2apic, movbe, popcnt, aes, xsave, avx, f16c, rdrand, hypervisor, lahf_lm, cmp_legacy, svm, extapic, cr8_legacy, abm, sse4a, misalignsse, 3dnowprefetch, osvw, topoext, ssbd, ibrs, ibpb, vmmcall, fsgsbase, bmi1, avx2, smep, bmi2, rdseed, adx, smap, clflushopt, clwb, sha_ni, xsaveopt, xsavec, xgetbv1, xsaves, clzero, wbnoinvd, arat, npt, svm_lock, nrip_save, vmcb_clean, flushbyasid, decodeassists, umip, rdpid, overflow_recov, succor",
+                    "hz_advertised": "2.4790 GHz",
+                    "hz_advertised_raw": [
+                        2479000000,
+                        0
+                    ],
+                    "logical_cores": 24,
+                    "num_cores": 24,
+                    "physical_cores": 24,
+                    "sockets": 1,
+                    "threads_per_core": 1,
+                    "vendor": "AuthenticAMD"
+                },
+                "disks": [
+                    {
+                        "drive": "nvme0n1",
+                        "function": "cache",
+                        "model": "VMware Virtual NVMe Disk",
+                        "serial": "VMware NVME_0000",
+                        "size": 1759218604032,
+                        "type": "SSD"
+                    },
+                    {
+                        "drive": "nvme0n2",
+                        "function": "cache",
+                        "model": "VMware Virtual NVMe Disk",
+                        "serial": "VMware NVME_0000",
+                        "size": 1759218604032,
+                        "type": "SSD"
+                    },
+                    {
+                        "drive": "sda",
+                        "function": "boot",
+                        "model": "Virtual_disk",
+                        "serial": "6000c293f5a7eb7d5986e664d6388435",
+                        "size": 515396075520,
+                        "type": "SSD"
+                    },
+                    {
+                        "drive": "sdb",
+                        "function": "data",
+                        "model": "VMware_Virtual_SATA_Hard_Drive",
+                        "serial": "01000000000000000001",
+                        "size": 2199023255552,
+                        "type": "HDD"
+                    },
+                    {
+                        "drive": "sdc",
+                        "function": "data",
+                        "model": "VMware_Virtual_SATA_Hard_Drive",
+                        "serial": "02000000000000000001",
+                        "size": 2199023255552,
+                        "type": "HDD"
+                    },
+                    {
+                        "drive": "sdd",
+                        "function": "data",
+                        "model": "VMware_Virtual_SATA_Hard_Drive",
+                        "serial": "03000000000000000001",
+                        "size": 2199023255552,
+                        "type": "HDD"
+                    },
+                    {
+                        "drive": "sde",
+                        "function": "data",
+                        "model": "VMware_Virtual_SATA_Hard_Drive",
+                        "serial": "04000000000000000001",
+                        "size": 2199023255552,
+                        "type": "HDD"
+                    },
+                    {
+                        "drive": "sdf",
+                        "function": "data",
+                        "model": "VMware_Virtual_SATA_Hard_Drive",
+                        "serial": "05000000000000000001",
+                        "size": 2199023255552,
+                        "type": "HDD"
+                    }
+                ],
+                "distribution": "openeuler",
+                "host_ip": "fe80::250:56ff:feb5:5786%ens161",
+                "host_uuid": "1f967a52-9ac8-11f0-9b61-05cf1b7143e4",
+                "hostname": "localhost.localdomain",
+                "ifaces": [
+                    {
+                        "hwaddr": "00:50:56:b5:17:66",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": "fe80::250:56ff:feb5:1766",
+                        "mtu": 1500,
+                        "name": "ens161",
+                        "pci_slot_name": "0000:04:00",
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": 25000000000,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:9c:2d",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ens162",
+                        "pci_slot_name": "0000:05:00",
+                        "physical_link_up": false,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:f0:6c",
+                        "ibdev": null,
+                        "ipv4": "10.0.20.203",
+                        "ipv6": "fe80::250:56ff:feb5:f06c",
+                        "mtu": 1500,
+                        "name": "ens192",
+                        "pci_slot_name": "0000:0b:00",
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": 10000000000,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:ef:73",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ens194",
+                        "pci_slot_name": "0000:0d:00",
+                        "physical_link_up": false,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:94:40",
+                        "ibdev": null,
+                        "ipv4": "10.0.20.204",
+                        "ipv6": "fe80::250:56ff:feb5:9440",
+                        "mtu": 1500,
+                        "name": "ens224",
+                        "pci_slot_name": "0000:13:00",
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": 10000000000,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:be:76",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ens225",
+                        "pci_slot_name": "0000:14:00",
+                        "physical_link_up": false,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:57:86",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": "fe80::250:56ff:feb5:5786",
+                        "mtu": 1500,
+                        "name": "ens256",
+                        "pci_slot_name": "0000:1b:00",
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": 25000000000,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:87:00",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ens257",
+                        "pci_slot_name": "0000:1c:00",
+                        "physical_link_up": false,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": true
+                    }
+                ],
+                "ipmi_ip": null,
+                "is_all_flash": false,
+                "is_os_in_raid1": false,
+                "is_os_in_single_disk": true,
+                "patch_version": "P4",
+                "product": "SMTXOS",
+                "sn": "VMware-42 35 15 55 e4 68 69 51-fc 29 5d ea 75 ad cf c1",
+                "status": "disabled",
+                "version": "6.2.0",
+                "zbs_spec": "normal",
+                "zbs_spec_valid": true
+            },
+            {
+                "arch": "x86_64",
+                "cgroup_profile_env": {
+                    "cpu_arch": "x86_64",
+                    "cpu_vendor": "AuthenticAMD",
+                    "deployment_env": null,
+                    "enable_lsm_io_threads_state": null,
+                    "is_hygon_hct": false,
+                    "is_metro": false,
+                    "is_nvme_over_rdma": false,
+                    "is_nvme_over_tcp": false,
+                    "is_rdma": false,
+                    "is_vhost": true,
+                    "is_vmware_by_dmidecode": true,
+                    "memory_total": 134654275584,
+                    "node_role": "master",
+                    "numa_info": {
+                        "numa_nodes": [
+                            {
+                                "cpus": [
+                                    [
+                                        0
+                                    ],
+                                    [
+                                        1
+                                    ],
+                                    [
+                                        2
+                                    ],
+                                    [
+                                        3
+                                    ],
+                                    [
+                                        4
+                                    ],
+                                    [
+                                        5
+                                    ],
+                                    [
+                                        6
+                                    ],
+                                    [
+                                        7
+                                    ],
+                                    [
+                                        8
+                                    ],
+                                    [
+                                        9
+                                    ],
+                                    [
+                                        10
+                                    ],
+                                    [
+                                        11
+                                    ],
+                                    [
+                                        12
+                                    ],
+                                    [
+                                        13
+                                    ],
+                                    [
+                                        14
+                                    ],
+                                    [
+                                        15
+                                    ],
+                                    [
+                                        16
+                                    ],
+                                    [
+                                        17
+                                    ],
+                                    [
+                                        18
+                                    ],
+                                    [
+                                        19
+                                    ],
+                                    [
+                                        20
+                                    ],
+                                    [
+                                        21
+                                    ],
+                                    [
+                                        22
+                                    ],
+                                    [
+                                        23
+                                    ]
+                                ],
+                                "free_mem_mb": 127363,
+                                "id": 0,
+                                "mem_size_mb": 128416
+                            }
+                        ]
+                    },
+                    "partition_total": 0,
+                    "platform": "kvm",
+                    "specified_mem_limits": {},
+                    "vm_min_free_bytes": 46963712,
+                    "zbs_spec": "normal"
+                },
+                "cpu": {
+                    "arch": "x86_64",
+                    "brand": "AMD EPYC 7K62 48-Core Processor",
+                    "cores_per_socket": 24,
+                    "flags": "fpu, vme, de, pse, tsc, msr, pae, mce, cx8, apic, sep, mtrr, pge, mca, cmov, pat, pse36, clflush, mmx, fxsr, sse, sse2, ht, syscall, nx, mmxext, fxsr_opt, pdpe1gb, rdtscp, lm, constant_tsc, rep_good, nopl, tsc_reliable, nonstop_tsc, cpuid, extd_apicid, pni, pclmulqdq, ssse3, fma, cx16, sse4_1, sse4_2, x2apic, movbe, popcnt, aes, xsave, avx, f16c, rdrand, hypervisor, lahf_lm, cmp_legacy, svm, extapic, cr8_legacy, abm, sse4a, misalignsse, 3dnowprefetch, osvw, topoext, ssbd, ibrs, ibpb, vmmcall, fsgsbase, bmi1, avx2, smep, bmi2, rdseed, adx, smap, clflushopt, clwb, sha_ni, xsaveopt, xsavec, xgetbv1, xsaves, clzero, wbnoinvd, arat, npt, svm_lock, nrip_save, vmcb_clean, flushbyasid, decodeassists, umip, rdpid, overflow_recov, succor",
+                    "hz_advertised": "2.4790 GHz",
+                    "hz_advertised_raw": [
+                        2479000000,
+                        0
+                    ],
+                    "logical_cores": 24,
+                    "num_cores": 24,
+                    "physical_cores": 24,
+                    "sockets": 1,
+                    "threads_per_core": 1,
+                    "vendor": "AuthenticAMD"
+                },
+                "disks": [
+                    {
+                        "drive": "nvme0n1",
+                        "function": "cache",
+                        "model": "VMware Virtual NVMe Disk",
+                        "serial": "VMware NVME_0000",
+                        "size": 1759218604032,
+                        "type": "SSD"
+                    },
+                    {
+                        "drive": "nvme0n2",
+                        "function": "cache",
+                        "model": "VMware Virtual NVMe Disk",
+                        "serial": "VMware NVME_0000",
+                        "size": 1759218604032,
+                        "type": "SSD"
+                    },
+                    {
+                        "drive": "sda",
+                        "function": "boot",
+                        "model": "Virtual_disk",
+                        "serial": "6000c29fd973b5bd02164bf8bf92648a",
+                        "size": 515396075520,
+                        "type": "SSD"
+                    },
+                    {
+                        "drive": "sdb",
+                        "function": "data",
+                        "model": "VMware_Virtual_SATA_Hard_Drive",
+                        "serial": "01000000000000000001",
+                        "size": 2199023255552,
+                        "type": "HDD"
+                    },
+                    {
+                        "drive": "sdc",
+                        "function": "data",
+                        "model": "VMware_Virtual_SATA_Hard_Drive",
+                        "serial": "02000000000000000001",
+                        "size": 2199023255552,
+                        "type": "HDD"
+                    },
+                    {
+                        "drive": "sdd",
+                        "function": "data",
+                        "model": "VMware_Virtual_SATA_Hard_Drive",
+                        "serial": "03000000000000000001",
+                        "size": 2199023255552,
+                        "type": "HDD"
+                    },
+                    {
+                        "drive": "sde",
+                        "function": "data",
+                        "model": "VMware_Virtual_SATA_Hard_Drive",
+                        "serial": "04000000000000000001",
+                        "size": 2199023255552,
+                        "type": "HDD"
+                    },
+                    {
+                        "drive": "sdf",
+                        "function": "data",
+                        "model": "VMware_Virtual_SATA_Hard_Drive",
+                        "serial": "05000000000000000001",
+                        "size": 2199023255552,
+                        "type": "HDD"
+                    }
+                ],
+                "distribution": "openeuler",
+                "host_ip": "fe80::250:56ff:feb5:9a38%ens256",
+                "host_uuid": "1ef75076-9ac8-11f0-838d-1320f7e67d81",
+                "hostname": "node-02",
+                "ifaces": [
+                    {
+                        "hwaddr": "00:50:56:b5:b1:5a",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": "fe80::250:56ff:feb5:b15a",
+                        "mtu": 1500,
+                        "name": "ens161",
+                        "pci_slot_name": "0000:04:00",
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": 25000000000,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:36:21",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ens162",
+                        "pci_slot_name": "0000:05:00",
+                        "physical_link_up": false,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:9d:75",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": "fe80::250:56ff:feb5:9d75",
+                        "mtu": 1500,
+                        "name": "ens192",
+                        "pci_slot_name": "0000:0b:00",
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": 10000000000,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:70:c7",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ens194",
+                        "pci_slot_name": "0000:0d:00",
+                        "physical_link_up": false,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:f6:be",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": "fe80::250:56ff:feb5:f6be",
+                        "mtu": 1500,
+                        "name": "ens224",
+                        "pci_slot_name": "0000:13:00",
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": 10000000000,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:49:89",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ens225",
+                        "pci_slot_name": "0000:14:00",
+                        "physical_link_up": false,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:9a:38",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": "fe80::250:56ff:feb5:9a38",
+                        "mtu": 1500,
+                        "name": "ens256",
+                        "pci_slot_name": "0000:1b:00",
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": 25000000000,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:14:09",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ens257",
+                        "pci_slot_name": "0000:1c:00",
+                        "physical_link_up": false,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:9d:75",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ovsbr-0trvhtjpy",
+                        "pci_slot_name": null,
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": false
+                    },
+                    {
+                        "hwaddr": "00:50:56:b5:f6:be",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ovsbr-foka63maz",
+                        "pci_slot_name": null,
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": false
+                    },
+                    {
+                        "hwaddr": "4a:a2:b8:b7:fb:43",
+                        "ibdev": null,
+                        "ipv4": null,
+                        "ipv6": null,
+                        "mtu": 1500,
+                        "name": "ovsbr-internal",
+                        "pci_slot_name": null,
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": false,
+                        "speed": null,
+                        "up": false
+                    },
+                    {
+                        "hwaddr": "8e:3e:2d:59:d8:05",
+                        "ibdev": null,
+                        "ipv4": "169.254.169.254",
+                        "ipv6": "fe80::8c3e:2dff:fe59:d805",
+                        "mtu": 1500,
+                        "name": "port-internal",
+                        "pci_slot_name": null,
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": null,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "f6:f8:a3:c0:98:1f",
+                        "ibdev": null,
+                        "ipv4": "10.0.20.205",
+                        "ipv6": "fe80::f4f8:a3ff:fec0:981f",
+                        "mtu": 1500,
+                        "name": "port-mgt",
+                        "pci_slot_name": null,
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": null,
+                        "up": true
+                    },
+                    {
+                        "hwaddr": "e2:a1:28:cb:f5:c3",
+                        "ibdev": null,
+                        "ipv4": "10.0.21.205",
+                        "ipv6": "fe80::e0a1:28ff:fecb:f5c3",
+                        "mtu": 1500,
+                        "name": "port-storage",
+                        "pci_slot_name": null,
+                        "physical_link_up": true,
+                        "rdma": false,
+                        "running": true,
+                        "speed": null,
+                        "up": true
+                    }
+                ],
+                "ipmi_ip": null,
+                "is_all_flash": false,
+                "is_os_in_raid1": false,
+                "is_os_in_single_disk": true,
+                "patch_version": "P4",
+                "product": "SMTXOS",
+                "sn": "VMware-42 35 26 9f 76 dc 4c 90-62 08 cf 46 0e 82 7c 9d",
+                "status": "disabled",
+                "version": "6.2.0",
+                "zbs_spec": "normal",
+                "zbs_spec_valid": true
+            }
+        ]
+    },
+    "ec": "EOK",
+    "error": {}
+}

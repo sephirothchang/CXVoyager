@@ -1,0 +1,9 @@
+{
+    "id": "root",
+    "username": "root",
+    "password": "",
+    "email": "root@test.com",
+    "role": "ROOT",
+    "annotation": "",
+    "auth_provider_id": "local"
+}

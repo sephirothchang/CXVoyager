@@ -1,0 +1,406 @@
+{
+    "platform": "kvm", // 平台类型，暂时固定为kvm
+    "cluster_name": "HCI-01", // 集群名称，来源于规划表
+    "dns_server": [
+        "127.0.0.1" // DNS服务器地址，来源于规划表
+    ],
+    "vdses": [
+        {
+            "name": "VDS-MGT",  // 管理虚拟交换机名称，来源于规划表
+            "bond_mode": "active-backup",//  管理虚拟交换机绑定模式，来源于规划表
+            "hosts_associated": [
+                {
+                    "host_uuid": "1f967a52-9ac8-11f0-9b61-05cf1b7143e4", // 主机UUID，来源于主机扫描结果，如果有多台主机，需全部列出
+                    "nics_associated": [
+                        "ens224", // 用于管理网络的物理网卡名称，来源于规划表，规划表中以逗号或分号分隔的多张网卡
+                        "ens192" // 用于管理网络的物理网卡名称，来源于规划表 ，规划表中以逗号或分号分隔的多张网卡
+                    ]
+                },
+                {
+                    "host_uuid": "1ef75076-9ac8-11f0-838d-1320f7e67d81",
+                    "nics_associated": [
+                        "ens224",
+                        "ens192"
+                    ]
+                },
+                {
+                    "host_uuid": "1f97a2d8-9ac8-11f0-978c-3b1611b8ef4a",
+                    "nics_associated": [
+                        "ens224",
+                        "ens192"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "VDS-SDS", // 存储虚拟交换机名称，来源于规划表
+            "bond_mode": "active-backup", // 存储虚拟交换机绑定模式，来源于规划表
+            "hosts_associated": [
+                {
+                    "host_uuid": "1f967a52-9ac8-11f0-9b61-05cf1b7143e4", // 主机UUID，来源于主机扫描结果，如果有多台主机，需全部列出
+                    "nics_associated": [
+                        "ens256", // 用于存储网络的物理网卡名称，来源于规划表，规划表中以逗号或分号分隔的多张网卡
+                        "ens161" // 用于存储网络的物理网卡名称，来源于规划表 ，规划表中以逗号或分号分隔的多张网卡
+                    ]
+                },
+                {
+                    "host_uuid": "1ef75076-9ac8-11f0-838d-1320f7e67d81",
+                    "nics_associated": [
+                        "ens256",
+                        "ens161"
+                    ]
+                },
+                {
+                    "host_uuid": "1f97a2d8-9ac8-11f0-978c-3b1611b8ef4a",
+                    "nics_associated": [
+                        "ens256",
+                        "ens161"
+                    ]
+                }
+            ]
+        }
+    ],
+    "networks": [
+        {
+            "name": "mgt-network", // 管理虚拟网络名称，固定值
+            "attached_vds": "VDS-MGT", // 所属虚拟交换机名称，必须与上面vdses中定义的名称一致
+            "network_type": "mgt", // 网络类型，管理网络固定为mgt
+            "network_config": {
+                "service": [
+                    {
+                        "host_uuid": "1f967a52-9ac8-11f0-9b61-05cf1b7143e4", // 主机UUID，来源于主机扫描结果，如果有多台主机，需全部列出
+                        "service_interface_name": "port-mgt", // 用于管理网络的虚拟网卡名称，固定为port-mgt
+                        "service_interface_ip": "10.0.20.204", // 该主机的用于管理网络的IP地址，来源于规划表
+                        "netmask": "255.255.255.0" // 用于管理网络的子网掩码，来源于规划表
+                    },
+                    {
+                        "host_uuid": "1ef75076-9ac8-11f0-838d-1320f7e67d81",
+                        "service_interface_name": "port-mgt",
+                        "service_interface_ip": "10.0.20.205",
+                        "netmask": "255.255.255.0"
+                    },
+                    {
+                        "host_uuid": "1f97a2d8-9ac8-11f0-978c-3b1611b8ef4a",
+                        "service_interface_name": "port-mgt",
+                        "service_interface_ip": "10.0.20.206",
+                        "netmask": "255.255.255.0"
+                    }
+                ],
+                "route": [
+                    {
+                        "gateway": "10.0.20.1" // 管理网络的默认网关，来源于规划表
+                    }
+                ]
+            },
+            "mode": {
+                "type": "vlan_access", // 管理网络的模式，固定为vlan_access
+                "network_identities": [
+                    0 // 管理网络的VLAN ID，来源于规划表
+                ]
+            }
+        },
+        {
+            "name": "storage-network", // 存储虚拟网络名称，固定值
+            "attached_vds": "VDS-SDS", // 所属虚拟交换机名称，必须与上面vdses中定义的名称一致
+            "network_type": "storage", // 网络类型，存储网络固定为storage
+            "network_config": {
+                "service": [
+                    {
+                        "host_uuid": "1f967a52-9ac8-11f0-9b61-05cf1b7143e4", // 主机UUID，来源于主机扫描结果，如果有多台主机，需全部列出    
+                        "service_interface_name": "port-storage", // 用于存储网络的虚拟网卡名称，固定为port-storage
+                        "service_interface_ip": "10.0.21.204", // 该主机的用于存储网络的IP地址，来源于规划表
+                        "netmask": "255.255.255.0" // 用于存储网络的子网掩码，来源于规划表
+                    },
+                    {
+                        "host_uuid": "1ef75076-9ac8-11f0-838d-1320f7e67d81",
+                        "service_interface_name": "port-storage",
+                        "service_interface_ip": "10.0.21.205",
+                        "netmask": "255.255.255.0"
+                    },
+                    {
+                        "host_uuid": "1f97a2d8-9ac8-11f0-978c-3b1611b8ef4a",
+                        "service_interface_name": "port-storage",
+                        "service_interface_ip": "10.0.21.206",
+                        "netmask": "255.255.255.0"
+                    }
+                ]
+            },
+            "mode": {
+                "type": "vlan_access", // 存储网络的模式，固定为vlan_access
+                "network_identities": [
+                    0 // 存储网络的VLAN ID，来源于规划表
+                ]
+            }
+        }
+    ],
+    "hosts": [
+        {
+            "host_ip": "fe80::250:56ff:feb5:9440%ens192", // 主机管理网卡的IPv6地址%拼接网卡名，注意有%符号，ipv6地址和网卡来源于主机扫描结果
+            "host_uuid": "1f967a52-9ac8-11f0-9b61-05cf1b7143e4", // 主机UUID，来源于主机扫描结果
+            "hostname": "node-01", // 主机名称，来源于规划表
+            "disk_data_with_cache": false, // 暂未知含义，暂时固定为false
+            "host_passwords": [
+                {
+                    "user": "root", // 主机登录用户名，固定为root
+                    "password": "c+G6KvJYsKyQyY4U" // 加密方式暂时未知，暂时固定为此值，对应的明文密码是P@ssw0rd!123
+                },
+                {
+                    "user": "smartx", // 主机登录用户名，固定为smartx
+                    "password": "c+G6KvJYsKyQyY4U" // 加密方式暂时未知，暂时固定为此值，对应的明文密码是P@ssw0rd!123
+                }
+            ],
+            "tags": [],
+            "ifaces": [
+                {
+                    "ip": "10.0.20.204", // 主机用于管理网络的IP地址，来源于规划表
+                    "function": "mgt" // 地址用途，管理网络固定为mgt
+                },
+                {
+                    "ip": "10.0.21.204", // 主机用于存储网络的IP地址，来源于规划表
+                    "function": "storage"   // 地址用途，存储网络固定为storage
+                }
+            ],
+            "disks": [
+                {
+                    "drive": "nvme0n1", // 磁盘设备名称，来源于主机扫描结果
+                    "function": "cache", // 磁盘用途，缓存盘固定为cache，来源于主机扫描结果
+                    "model": "VMware Virtual NVMe Disk",    // 磁盘型号，来源于主机扫描结果
+                    "serial": "VMware NVME_0000", // 磁盘序列号，来源于主机扫描结果
+                    "size": 1759218604032, // 磁盘大小，单位字节，来源于主机扫描结果
+                    "type": "SSD" // 磁盘类型，SSD或HDD，来源于主机扫描结果
+                },
+                {
+                    "drive": "nvme0n2",
+                    "function": "cache",
+                    "model": "VMware Virtual NVMe Disk",
+                    "serial": "VMware NVME_0000",
+                    "size": 1759218604032,
+                    "type": "SSD"
+                },
+                {
+                    "drive": "sdb",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "01000000000000000001",
+                    "size": 2199023255552,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sdc",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "02000000000000000001",
+                    "size": 2199023255552,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sdd",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "03000000000000000001",
+                    "size": 2199023255552,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sde",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "04000000000000000001",
+                    "size": 2199023255552,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sdf",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "05000000000000000001",
+                    "size": 2199023255552,
+                    "type": "HDD"
+                }
+            ],
+            "is_master": true, // 是否为主节点，前三台主机固定为true，如果主机数量大于等于5台，则前五台主机为true，其余为false
+            "with_faster_ssd_as_cache": true // 分层模式，启用分层模式固定为true，来源与规划表
+        },
+        {
+            "host_ip": "fe80::e0a1:28ff:fecb:f5c3%ens192", 
+            "host_uuid": "1ef75076-9ac8-11f0-838d-1320f7e67d81", 
+            "hostname": "node-02",
+            "disk_data_with_cache": false,
+            "host_passwords": [
+                {
+                    "user": "root",
+                    "password": "c+G6KvJYsKyQyY4U"
+                },
+                {
+                    "user": "smartx",
+                    "password": "c+G6KvJYsKyQyY4U"
+                }
+            ],
+            "tags": [],
+            "ifaces": [
+                {
+                    "ip": "10.0.20.205",
+                    "function": "mgt"
+                },
+                {
+                    "ip": "10.0.21.205",
+                    "function": "storage"
+                }
+            ],
+            "disks": [
+                {
+                    "drive": "nvme0n1",
+                    "function": "cache",
+                    "model": "VMware Virtual NVMe Disk",
+                    "serial": "VMware NVME_0000",
+                    "size": 1759218604032,
+                    "type": "SSD"
+                },
+                {
+                    "drive": "nvme0n2",
+                    "function": "cache",
+                    "model": "VMware Virtual NVMe Disk",
+                    "serial": "VMware NVME_0000",
+                    "size": 1759218604032,
+                    "type": "SSD"
+                },
+                {
+                    "drive": "sdb",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "01000000000000000001",
+                    "size": 2199023255552,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sdc",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "02000000000000000001",
+                    "size": 2199023255552,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sdd",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "03000000000000000001",
+                    "size": 2199023255552,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sde",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "04000000000000000001",
+                    "size": 2199023255552,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sdf",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "05000000000000000001",
+                    "size": 2199023255552,
+                    "type": "HDD"
+                }
+            ],
+            "is_master": true,
+            "with_faster_ssd_as_cache": true
+        },
+        {
+            "host_ip": "fe80::9488:73ff:feeb:609%ens192",
+            "host_uuid": "1f97a2d8-9ac8-11f0-978c-3b1611b8ef4a",
+            "hostname": "node-03",
+            "disk_data_with_cache": false,
+            "host_passwords": [
+                {
+                    "user": "root",
+                    "password": "c+G6KvJYsKyQyY4U"
+                },
+                {
+                    "user": "smartx",
+                    "password": "c+G6KvJYsKyQyY4U"
+                }
+            ],
+            "tags": [],
+            "ifaces": [
+                {
+                    "ip": "10.0.20.206",
+                    "function": "mgt"
+                },
+                {
+                    "ip": "10.0.21.206",
+                    "function": "storage"
+                }
+            ],
+            "disks": [
+                {
+                    "drive": "nvme0n1",
+                    "function": "cache",
+                    "model": "VMware Virtual NVMe Disk",
+                    "serial": "VMware NVME_0000",
+                    "size": 1759218604032,
+                    "type": "SSD"
+                },
+                {
+                    "drive": "nvme0n2",
+                    "function": "cache",
+                    "model": "VMware Virtual NVMe Disk",
+                    "serial": "VMware NVME_0000",
+                    "size": 1759218604032,
+                    "type": "SSD"
+                },
+                {
+                    "drive": "sdb",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "01000000000000000001",
+                    "size": 2199023255552,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sdc",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "02000000000000000001",
+                    "size": 2199023255552,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sdd",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "03000000000000000001",
+                    "size": 2199023255552,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sde",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "04000000000000000001",
+                    "size": 2199023255552,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sdf",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "05000000000000000001",
+                    "size": 2199023255552,
+                    "type": "HDD"
+                }
+            ],
+            "is_master": true,
+            "with_faster_ssd_as_cache": true
+        }
+    ],
+    "ntp": {
+        "mode": "internal", // NTP模式，为了防止部署失败，暂时部署时固定为internal，部署后根据规划表配置调用api接口进行修改
+        "ntp_server": null, // NTP服务器地址，internal模式下固定为null
+        "current_time": "2025-09-26T14:02:29.381Z" // 发送载荷时的当前时间，格式为yyyy-MM-ddTHH:mm:ss.sssZ
+    },
+    "vhost_enabled": true, // vhost功能开关，启用vhost时为true，来源于规划表的集群功能选项，如启用boost或boost+RDMA模式则为true
+    "rdma_enabled": false // RDMA功能开关，启用RDMA时为true，来源于规划表的集群功能选项，如启用RDMA或boost+RDMA则为true
+}
