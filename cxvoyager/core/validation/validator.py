@@ -70,6 +70,34 @@ def _check_ips_within_network(ips: Iterable[str], cidr: str, label: str) -> Tupl
     return errors, warnings
 
 
+def _check_ips_in_any_network(ips: Iterable[str], cidrs: List[str]) -> List[str]:
+    """验证 IP 是否至少落在任一声明的子网中。"""
+
+    if not cidrs:
+        return []
+
+    networks = []
+    for cidr in cidrs:
+        try:
+            networks.append(ip_network(cidr, strict=False))
+        except ValueError:
+            # 非法子网会在前置校验中报错，这里忽略以避免重复。
+            continue
+
+    errors: List[str] = []
+    for ip_str in ips:
+        try:
+            addr = ip_address(ip_str)
+        except ValueError:
+            errors.append(f"管理组件 IP {ip_str} 非法，无法校验所属网络")
+            continue
+        if not any(addr in net for net in networks):
+            errors.append(
+                f"管理组件 IP {ip_str} 未落在任何声明的子网 {', '.join(sorted({n.with_prefixlen for n in networks}))} 内"
+            )
+    return errors
+
+
 def _validate_management_components(parsed: Dict[str, Any]) -> Tuple[List[str], List[str], Dict[str, Any] | None]:
     vn_section = parsed.get("virtual_network", {})
     vn_records = vn_section.get("records", []) if isinstance(vn_section, dict) else []
@@ -93,6 +121,8 @@ def _validate_management_components(parsed: Dict[str, Any]) -> Tuple[List[str], 
         "component_ips": component_ips,
     }
 
+    cidr_pool = [r.get("subnetwork") for r in vn_records if r.get("subnetwork")]
+
     if extra_record:
         extra_cidr = extra_record.get("subnetwork")
         details["expected_network"] = {"type": "extra_mgmt", "cidr": extra_cidr}
@@ -111,6 +141,9 @@ def _validate_management_components(parsed: Dict[str, Any]) -> Tuple[List[str], 
             net_errors, net_warnings = _check_ips_within_network(component_ips, default_cidr, "默认管理网络")
             errors.extend(net_errors)
             warnings.extend(net_warnings)
+
+    # 补充校验：至少落在任一声明的子网内，防止标识错误导致漏检。
+    errors.extend(_check_ips_in_any_network(component_ips, cidr_pool))
 
     return errors, warnings, details
 
