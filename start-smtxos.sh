@@ -116,11 +116,11 @@ main() {
   fi
 
   if [ -z "$PYTHON_BIN" ]; then
-    echo "未找到可用的 python3，请先准备便携版 3.9 到 $PY_PORTABLE_DIR" >&2
+    echo "未找到可用的 python3，请先准备便携版 3.10+ 到 $PY_PORTABLE_DIR" >&2
     exit 1
   fi
 
-  # 检查版本是否 >= 3.9，否则提醒使用便携版
+  # 检查版本是否 >= 3.10，否则提醒使用便携版
   PY_VER_OUT="$($PYTHON_BIN - <<'PY'
 import sys
 v=sys.version_info
@@ -129,8 +129,8 @@ PY
   )"
   PY_MAJOR=${PY_VER_OUT%%.*}
   PY_MINOR=${PY_VER_OUT#*.}
-  if [ "${PY_MAJOR:-0}" -lt 3 ] || { [ "${PY_MAJOR:-0}" -eq 3 ] && [ "${PY_MINOR:-0}" -lt 9 ]; }; then
-    echo "当前 Python 版本 $PY_VER_OUT 低于 3.9，请放置或解压便携版到 $PY_PORTABLE_DIR" >&2
+  if [ "${PY_MAJOR:-0}" -lt 3 ] || { [ "${PY_MAJOR:-0}" -eq 3 ] && [ "${PY_MINOR:-0}" -lt 10 ]; }; then
+    echo "当前 Python 版本 $PY_VER_OUT 低于 3.10，请放置或解压便携版到 $PY_PORTABLE_DIR" >&2
     exit 1
   fi
 
