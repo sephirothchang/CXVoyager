@@ -11,6 +11,8 @@ api:
   mock: false
   # SmartX 鉴权令牌，`init_cluster`/各 deploy_* 阶段/`core/deployment/host_discovery_scanner.py` 在请求头中使用；`common/config/__init__.py` 会保证该键存在。
   x-smartx-token: "e79b85fc18b7402fbcc0391fe8d7d24c"
+  # 初始化集群前使用的固定鉴权令牌，适用于扫描/部署 API。
+  default-x-smartx-token: "e79b85fc18b7402fbcc0391fe8d7d24c"
   # REST 调用超时，传入 `APIClient`（见 `init_cluster` 和各 deploy_* 阶段）。
   timeout: 10
 
@@ -117,6 +119,16 @@ cloudtower:
     download_dir: ""
     # 可选的自定义巡检项列表，留空使用默认值。
     user_defined_items: []
+
+svt:
+  # VMTools/SVT 镜像上传默认配置。
+  enabled: true
+  # 本地镜像路径，留空则按 glob 规则搜索。
+  iso_path: ""
+  # 镜像匹配规则，默认查找 SMTX_VMTOOLS-*.iso。
+  iso_glob: "SMTX_VMTOOLS-*.iso"
+  # 若接口未返回 chunk_size 时的回退值（字节）。
+  chunk_size_fallback: 8388608
 
 host_scan:
   # 主机存活探测的默认 HTTP 超时和重试次数。

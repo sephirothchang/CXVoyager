@@ -60,4 +60,5 @@ class PlanModel(BaseModel):
     hosts: List[HostRow] = []
     mgmt: Optional[MgmtInfo] = None
     source_file: Optional[str] = None
+    storage_architecture: Optional[str] = None
 

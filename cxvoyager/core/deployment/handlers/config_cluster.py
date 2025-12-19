@@ -16,9 +16,12 @@
 
 # Stage 3 config_cluster – 集群配置
 from __future__ import annotations
+import hashlib
 import importlib
 import logging
+import math
 import re
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
 
@@ -35,6 +38,7 @@ from cxvoyager.integrations.smartx.api_client import APIClient, APIError
 from cxvoyager.integrations.excel import field_variables as plan_vars
 
 logger = logging.getLogger(__name__)
+DEFAULT_SVT_CHUNK_SIZE = 8 * 1024 * 1024
 
 
 @stage_handler(Stage.config_cluster)
@@ -401,7 +405,26 @@ def run_config_cluster_stage(ctx_dict):
     if password_summary is not None:
         results.append(password_summary)
 
-    # === 8. 获取并回填集群序列号 ===
+    # === 8. 上传虚拟机工具（SVT） ===
+    svt_entry = _upload_svt_image(
+        ctx=ctx,
+        client=client,
+        auth_headers=auth_headers,
+        cluster_vip=cluster_vip,
+        stage_logger=stage_logger,
+    )
+    if svt_entry:
+        results.append(svt_entry)
+
+    # === 9. 配置 CPU 兼容性 ===
+    _configure_cpu_compatibility(
+        client=client,
+        headers=auth_headers,
+        stage_logger=stage_logger,
+        results=results,
+    )
+
+    # === 10. 获取并回填集群序列号 ===
     stage_logger.info("正在获取集群序列号")
     license_resp = _fetch_json_response(client, "/api/v2/tools/license", auth_headers, "获取集群序列号", results)
     license_entry = results[-1]
@@ -436,7 +459,7 @@ def run_config_cluster_stage(ctx_dict):
     else:
         stage_logger.warning("未能获取集群序列号")
 
-    # === 9. 持久化阶段执行明细到运行上下文 ===
+    # === 11. 持久化阶段执行明细到运行上下文 ===
     ctx.extra.setdefault('config_cluster', {})['results'] = results
     stage_logger.info("集群配置阶段完成")
 
@@ -930,7 +953,13 @@ def _update_host_login_passwords(stage_logger, host_entries: List[Dict[str, Any]
         target_password = entry.get('ssh_password') or host_cfg.get('target_password') or DEFAULT_PASSWORD
         if not target_password:
             continue
-        login_user = entry.get('ssh_user') or host_cfg.get('login_user') or 'smartx'
+        login_user = host_cfg.get('login_user') or 'smartx'
+        if str(login_user).lower() != 'smartx':
+            stage_logger.warning(
+                "密码更新登录账号固定使用 smartx，已忽略自定义",
+                progress_extra={"host": mgmt_ip, "login_user": login_user},
+            )
+            login_user = 'smartx'
         login_password = host_cfg.get('login_password') or entry.get('ssh_password') or DEFAULT_PASSWORD
         root_password = host_cfg.get('root_password') or target_password
         jobs_map[mgmt_ip] = {
@@ -1074,3 +1103,426 @@ def _write_cluster_serial_to_plan(plan_path: Path, serial: str) -> None:
     sheet = workbook[plan_vars.CLUSTER_SERIAL.sheet]
     sheet[plan_vars.CLUSTER_SERIAL.cell] = serial
     workbook.save(plan_path)
+
+
+def _upload_svt_image(
+    *,
+    ctx: RunContext,
+    client: APIClient,
+    auth_headers: Dict[str, str],
+    cluster_vip: Optional[str],
+    stage_logger,
+) -> Optional[Dict[str, Any]]:
+    cfg_dict: Dict[str, Any] = ctx.config or {}
+    svt_cfg = cfg_dict.get('svt', {}) if isinstance(cfg_dict, dict) else {}
+
+    if isinstance(svt_cfg, dict) and svt_cfg.get('enabled') is False:
+        stage_logger.info("配置已禁用 SVT 上传，跳过")
+        return {"action": "上传SVT镜像", "status": "skipped", "reason": "disabled"}
+
+    iso_path = _resolve_svt_iso_path(ctx, svt_cfg)
+    if iso_path is None:
+        stage_logger.warning(
+            "未找到 SVT 镜像文件，跳过上传",
+            progress_extra={"glob": (svt_cfg.get('iso_glob') if isinstance(svt_cfg, dict) else None)},
+        )
+        return {"action": "上传SVT镜像", "status": "skipped", "reason": "not_found"}
+
+    iso_size = iso_path.stat().st_size
+    if iso_size <= 0:
+        stage_logger.warning(
+            "SVT 镜像为空，跳过上传",
+            progress_extra={"path": str(iso_path)},
+        )
+        return {"action": "上传SVT镜像", "status": "skipped", "reason": "empty_file"}
+
+    upload_client = client
+    if cluster_vip and getattr(client, "mock", False) is False:
+        try:
+            upload_client = APIClient(
+                base_url=f"http://{cluster_vip}",
+                mock=client.mock,
+                timeout=client.timeout,
+                verify=getattr(client, "verify", True),
+            )
+            stage_logger.debug(
+                "SVT 上传优先使用集群 VIP",
+                progress_extra={"base_url": upload_client.base_url},
+            )
+        except Exception as exc:  # noqa: BLE001 - 回退到现有客户端
+            stage_logger.warning(
+                "基于集群 VIP 的上传客户端创建失败，回退到默认 API 客户端",
+                progress_extra={"error": str(exc)},
+            )
+
+    upload_headers = dict(auth_headers)
+    upload_headers.pop("content-type", None)
+
+    chunk_size_fallback = int(svt_cfg.get('chunk_size_fallback') or DEFAULT_SVT_CHUNK_SIZE)
+    max_attempts = 2
+    last_error: Optional[Exception] = None
+
+    stage_logger.info(
+        "准备上传 SVT 镜像",
+        progress_extra={"path": str(iso_path), "size": iso_size, "cluster_vip": cluster_vip},
+    )
+
+    for attempt in range(1, max_attempts + 1):
+        volume_info: Optional[Dict[str, Any]] = None
+        try:
+            volume_info = _create_svt_upload_volume(
+                client=upload_client,
+                headers=upload_headers,
+                iso_path=iso_path,
+                iso_size=iso_size,
+                chunk_size_fallback=chunk_size_fallback,
+                stage_logger=stage_logger,
+            )
+            summary = _upload_svt_chunks(
+                client=upload_client,
+                headers=upload_headers,
+                iso_path=iso_path,
+                iso_size=iso_size,
+                volume_info=volume_info,
+                stage_logger=stage_logger,
+            )
+            summary["file_name"] = iso_path.name
+            summary["file_size"] = iso_size
+            ctx.extra.setdefault('config_cluster', {})['svt_image'] = summary
+            ctx.extra.setdefault('deploy_cloudtower', {}).setdefault('vmtools', summary)
+            stage_logger.info(
+                "SVT 镜像上传完成",
+                progress_extra={"image_uuid": summary.get("image_uuid"), "zbs_volume_id": summary.get("zbs_volume_id")},
+            )
+            return {
+                "action": "上传SVT镜像",
+                "status": "ok",
+                "image_uuid": summary.get("image_uuid"),
+                "zbs_volume_id": summary.get("zbs_volume_id"),
+            }
+        except Exception as exc:  # noqa: BLE001 - 记录失败并重试
+            last_error = exc
+            stage_logger.warning(
+                "SVT 上传尝试失败，准备回滚后重试",
+                progress_extra={"attempt": attempt, "error": str(exc)},
+            )
+            if volume_info and volume_info.get("image_uuid"):
+                _cleanup_svt_image(upload_client, upload_headers, str(volume_info.get("image_uuid")), stage_logger)
+
+    if last_error is None:
+        last_error = RuntimeError("SVT 上传失败，未捕获具体原因")
+    stage_logger.error(
+        "SVT 镜像上传失败，将跳过并记录以便后续人工处理",
+        progress_extra={"error": str(last_error)},
+    )
+    return {
+        "action": "上传SVT镜像",
+        "status": "warning",
+        "error": str(last_error),
+    }
+
+
+def _configure_cpu_compatibility(
+    *,
+    client: APIClient,
+    headers: Dict[str, str],
+    stage_logger,
+    results: List[Dict[str, Any]],
+) -> None:
+    try:
+        stage_logger.info("正在查询推荐 CPU 兼容性")
+        recommend_resp = _fetch_json_response(
+            client,
+            "/api/v2/elf/cluster_recommended_cpu_models",
+            headers,
+            "查询推荐CPU兼容性",
+            results,
+        )
+        model = _extract_recommended_cpu_model(recommend_resp)
+        if not model:
+            warning_msg = "未获取到推荐 CPU 兼容性，跳过配置"
+            stage_logger.warning(warning_msg)
+            results.append({"action": "配置CPU兼容性", "status": "skipped", "reason": "no_recommendation"})
+            return
+
+        payload = {"cpu_model": model}
+        stage_logger.info("正在配置 CPU 兼容性", progress_extra={"cpu_model": model})
+        _send_put_request(
+            client,
+            "/api/v2/elf/cluster_cpu_compatibility",
+            payload,
+            headers,
+            "配置CPU兼容性",
+            results,
+        )
+    except Exception as exc:  # noqa: BLE001 - 不阻断流程
+        stage_logger.warning(
+            "CPU 兼容性配置失败，已跳过，请后续人工确认",
+            progress_extra={"error": str(exc)},
+        )
+        results.append({"action": "配置CPU兼容性", "status": "warning", "error": str(exc)})
+
+
+def _extract_recommended_cpu_model(response: Dict[str, Any]) -> Optional[str]:
+    if not isinstance(response, dict):
+        return None
+    data = response.get("data")
+    if isinstance(data, dict):
+        models = data.get("cpu_models")
+        if isinstance(models, list) and models:
+            first = models[0]
+            if isinstance(first, str) and first.strip():
+                return first.strip()
+    models = response.get("cpu_models")
+    if isinstance(models, list) and models:
+        first = models[0]
+        if isinstance(first, str) and first.strip():
+            return first.strip()
+    return None
+
+
+def _resolve_svt_iso_path(ctx: RunContext, svt_cfg: Dict[str, Any]) -> Optional[Path]:
+    work_dir = ctx.work_dir if isinstance(ctx.work_dir, Path) else Path.cwd()
+    iso_path_cfg = svt_cfg.get('iso_path') if isinstance(svt_cfg, dict) else None
+    glob_pattern = svt_cfg.get('iso_glob', 'SMTX_VMTOOLS-*.iso') if isinstance(svt_cfg, dict) else 'SMTX_VMTOOLS-*.iso'
+
+    candidates: List[Path] = []
+    if iso_path_cfg:
+        path = Path(iso_path_cfg)
+        if not path.is_absolute():
+            path = work_dir / path
+        candidates.append(path)
+
+    if not candidates:
+        versioned: List[tuple[tuple[int, ...], Path]] = []
+        unversioned: List[Path] = []
+
+        for path in work_dir.glob(glob_pattern):
+            if not path.exists() or not path.is_file():
+                continue
+            version = _extract_vmtools_version(path.name)
+            if version:
+                versioned.append((version, path))
+            else:
+                unversioned.append(path)
+
+        if versioned:
+            # 优先选择版本号最高的文件，版本相同时按修改时间最新。
+            versioned.sort(key=lambda item: (item[0], item[1].stat().st_mtime), reverse=True)
+            candidates.append(versioned[0][1])
+        elif unversioned:
+            unversioned.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+            candidates.append(unversioned[0])
+
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            return candidate
+    return None
+
+
+def _extract_vmtools_version(name: str) -> Optional[tuple[int, ...]]:
+    match = re.search(r"SMTX_VMTOOLS-([0-9]+(?:\.[0-9]+){0,2})", name)
+    if not match:
+        return None
+    parts = match.group(1).split('.')
+    try:
+        numbers = [int(part) for part in parts]
+    except ValueError:
+        return None
+    while len(numbers) < 3:
+        numbers.append(0)
+    return tuple(numbers)
+
+
+def _create_svt_upload_volume(
+    *,
+    client: APIClient,
+    headers: Dict[str, str],
+    iso_path: Path,
+    iso_size: int,
+    chunk_size_fallback: int,
+    stage_logger,
+) -> Dict[str, Any]:
+    params = {"name": iso_path.name, "size": iso_size}
+    stage_logger.info(
+        "创建 SVT 上传卷",
+        progress_extra={"file_name": iso_path.name, "size": iso_size},
+    )
+    response = client.post("/api/v2/svt_image/create_volume", None, headers=headers, params=params, data={})
+    data = _extract_data_dict(response)
+
+    image_uuid = data.get("image_uuid") or data.get("uuid") or data.get("id")
+    zbs_volume_id = data.get("zbs_volume_id") or data.get("volume_id")
+    chunk_size = int(data.get("chunk_size") or chunk_size_fallback or DEFAULT_SVT_CHUNK_SIZE)
+    if chunk_size <= 0:
+        chunk_size = DEFAULT_SVT_CHUNK_SIZE
+    to_upload = data.get("to_upload") if isinstance(data.get("to_upload"), list) else None
+
+    if not image_uuid or not zbs_volume_id:
+        raise RuntimeError("创建 SVT 上传卷响应缺少 image_uuid 或 zbs_volume_id")
+
+    stage_logger.info(
+        "SVT 上传卷创建成功",
+        progress_extra={
+            "image_uuid": image_uuid,
+            "zbs_volume_id": zbs_volume_id,
+            "chunk_size": chunk_size,
+            "total_chunks": len(to_upload) if to_upload is not None else None,
+        },
+    )
+
+    return {
+        "image_uuid": image_uuid,
+        "zbs_volume_id": zbs_volume_id,
+        "chunk_size": chunk_size,
+        "to_upload": to_upload or [],
+        "image_path": data.get("image_path"),
+    }
+
+
+def _upload_svt_chunks(
+    *,
+    client: APIClient,
+    headers: Dict[str, str],
+    iso_path: Path,
+    iso_size: int,
+    volume_info: Dict[str, Any],
+    stage_logger,
+    chunk_retry: int = 2,
+) -> Dict[str, Any]:
+    image_uuid = volume_info["image_uuid"]
+    zbs_volume_id = volume_info["zbs_volume_id"]
+    chunk_size = int(volume_info.get("chunk_size") or DEFAULT_SVT_CHUNK_SIZE)
+    if chunk_size <= 0:
+        chunk_size = DEFAULT_SVT_CHUNK_SIZE
+
+    sha256 = hashlib.sha256()
+    uploaded_chunks = 0
+    chunk_numbers: List[int] = []
+    uploaded_bytes = 0
+    total_chunks = len(volume_info.get("to_upload", [])) if isinstance(volume_info.get("to_upload"), list) else 0
+    if chunk_size > 0:
+        estimated_total = math.ceil(iso_size / chunk_size)
+        if estimated_total:
+            total_chunks = max(total_chunks, estimated_total)
+
+    start_time = time.monotonic()
+    last_log_time = start_time
+
+    def _log_progress(current_chunk_index: int, remaining_chunks: Optional[int], *, force: bool = False) -> None:
+        nonlocal last_log_time
+        now = time.monotonic()
+        if not force and (now - last_log_time) < 2:
+            return
+        elapsed = max(now - start_time, 1e-6)
+        speed_bps = uploaded_bytes / elapsed if uploaded_bytes else 0.0
+        progress_percent = (uploaded_bytes / iso_size * 100) if iso_size else None
+        percentage: Optional[float] = None
+        if total_chunks:
+            percentage = (max(current_chunk_index, 0) / total_chunks) * 100
+        elif progress_percent is not None:
+            percentage = progress_percent
+        if percentage is not None:
+            percentage = max(0.0, min(percentage, 100.0))
+        stage_logger.info(
+            "SVT 上传进度",
+            progress_extra={
+                "chunk": max(current_chunk_index, 0),
+                "total_chunks": total_chunks or None,
+                "remaining_chunks": remaining_chunks,
+                "uploaded_bytes": uploaded_bytes,
+                "total_bytes": iso_size,
+                "progress_percent": round(progress_percent, 2) if progress_percent is not None else None,
+                "percentage": round(percentage, 2) if percentage is not None else None,
+                "speed_bps": speed_bps,
+            },
+        )
+        last_log_time = now
+
+    with iso_path.open('rb') as iso_file:
+        chunk_num = 0
+        while True:
+            chunk = iso_file.read(chunk_size)
+            if not chunk:
+                break
+            sha256.update(chunk)
+            uploaded_bytes += len(chunk)
+            params = {
+                "zbs_volume_id": zbs_volume_id,
+                "chunk_num": chunk_num,
+                "image_uuid": image_uuid,
+            }
+
+            attempt_error: Optional[Exception] = None
+            for attempt in range(1, chunk_retry + 2):
+                try:
+                    response = client.post(
+                        "/api/v2/svt_image/upload_template",
+                        None,
+                        headers=headers,
+                        params=params,
+                        files={"file": (iso_path.name, chunk, "application/octet-stream")},
+                    )
+                    attempt_error = None
+                    break
+                except Exception as exc:  # noqa: BLE001
+                    attempt_error = exc
+                    if attempt > chunk_retry:
+                        break
+                    stage_logger.warning(
+                        "SVT 分片上传失败，重试中",
+                        progress_extra={"chunk_num": chunk_num, "attempt": attempt, "error": str(exc)},
+                    )
+                    time.sleep(1)
+
+            if attempt_error is not None:
+                raise RuntimeError(f"上传 SVT 分片 {chunk_num} 失败: {attempt_error}") from attempt_error
+
+            data = _extract_data_dict(response)
+            to_upload = data.get("to_upload") if isinstance(data.get("to_upload"), list) else None
+            remaining_chunks = len(to_upload) if to_upload is not None else None
+            if remaining_chunks is not None and total_chunks:
+                total_chunks = max(total_chunks, uploaded_chunks + remaining_chunks + 1)
+
+            uploaded_chunks += 1
+            chunk_numbers.append(chunk_num)
+            _log_progress(uploaded_chunks, remaining_chunks, force=False)
+            stage_logger.debug(
+                "SVT 分片上传成功",
+                progress_extra={"chunk_num": chunk_num, "remaining": remaining_chunks},
+            )
+            chunk_num += 1
+
+    _log_progress(uploaded_chunks, 0, force=True)
+
+    return {
+        "image_uuid": image_uuid,
+        "zbs_volume_id": zbs_volume_id,
+        "chunk_size": chunk_size,
+        "uploaded_chunks": uploaded_chunks,
+        "sha256": sha256.hexdigest(),
+        "chunk_numbers": chunk_numbers,
+        "image_path": volume_info.get("image_path"),
+    }
+
+
+def _cleanup_svt_image(client: APIClient, headers: Dict[str, str], image_uuid: str, stage_logger) -> None:
+    if not image_uuid:
+        return
+    try:
+        client.delete(f"/api/v2/images/{image_uuid}", headers=headers)
+        stage_logger.warning("已回滚 SVT 上传卷", progress_extra={"image_uuid": image_uuid})
+    except Exception as exc:  # noqa: BLE001
+        stage_logger.warning(
+            "清理 SVT 上传卷失败",
+            progress_extra={"image_uuid": image_uuid, "error": str(exc)},
+        )
+
+
+def _extract_data_dict(response: Any) -> Dict[str, Any]:
+    if isinstance(response, dict):
+        data = response.get("data")
+        if isinstance(data, dict):
+            return data
+        return response
+    return {}

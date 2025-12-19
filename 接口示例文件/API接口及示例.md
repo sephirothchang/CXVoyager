@@ -907,9 +907,9 @@ x-smartx-token：d513e36581044eb691ba9589eebac995
   通过使用smartx账号（初始化集群后的默认密码是P@ssw0rd!123，需要修改为规划表中的密码）ssh到主机执行passwd命令实现
   根据规划表中的密码对主机密码进行批量修改
 
-  ## 上传虚拟机工具（SVT）（还未完成，等待接口文档）
+  ## 上传虚拟机工具（SVT）
   通过接口首先创建SVT卷
-  请求网址（两个参数，name是上传的文件名称，size是上传的文件大小，单位是字节）
+  请求网址（IP应该是优先使用集群VIP，其次是主机IP，name是上传的文件名称，size是上传的文件大小，单位是字节）
   https://10.0.20.211/api/v2/svt_image/create_volume?name=SMTX_VMTOOLS-3.2.0-2501210639.iso&size=317816832
   请求方法
   POST
@@ -993,6 +993,66 @@ x-smartx-token：d513e36581044eb691ba9589eebac995
 
   状态代码 200
 
+
+  ## 配置CPU兼容性
+
+  ### 第一步，获取当前集群的推荐CPU兼容性
+  请求网址
+  https://10.0.20.10/api/v2/elf/cluster_recommended_cpu_models
+  请求方法
+  GET
+  
+  添加header （这部分的x-smartx-token是登录fisheye获取token获取的）
+  x-smartx-token：df91526d34a94dc9bada16437e1c579f
+
+  响应示例（其中cpu_models字段值即为当前集群推荐的CPU兼容性，第二步即使用这个字段构建载荷）
+  {
+  "data": {
+    "cpu_models": [
+      "EPYC"
+    ]
+  },
+  "ec": "EOK",
+  "error": {}
+  }
+
+  ### 第二步，配置CPU兼容性
+  请求网址
+  https://10.0.20.10/api/v2/elf/cluster_cpu_compatibility
+  请求方法
+  PUT
+
+  添加header （这部分的x-smartx-token是登录fisheye获取token获取的）
+  x-smartx-token：df91526d34a94dc9bada16437e1c579f
+
+  载荷
+  {"cpu_model":"EPYC"}
+
+  响应示例
+  {
+  "data": {},
+  "ec": "EOK",
+  "error": {}
+  }
+
+
+  ### 第三步，验证CPU兼容性配置是否成功
+  请求网址
+  https://10.0.20.10/api/v2/elf/cluster_cpu_compatibility
+  请求方法
+  GET
+
+  添加header （这部分的x-smartx-token是登录fisheye获取token获取的）
+  x-smartx-token：df91526d34a94dc9bada16437e1c579f
+
+  响应示例（其中cpu_model字段值即为当前集群配置的CPU兼容性，应该与上一步配置的值一致）
+  {
+  "data": {
+    "cpu_model": "EPYC"
+  },
+  "ec": "EOK",
+  "error": {}
+  }
 
 
 
@@ -1684,7 +1744,7 @@ x-smartx-token：d513e36581044eb691ba9589eebac995
   载荷
   {"operationName":"deployedLicense","variables":{},"query":"query deployedLicense {\n  deploys(first: 1) {\n    id\n    license {\n      id\n      license_serial\n      maintenance_end_date\n      maintenance_start_date\n      max_chunk_num\n      max_cluster_num\n      max_vm_num\n      used_vm_num\n      sign_date\n      expire_date\n      software_edition\n      type\n      vendor\n      __typename\n    }\n    __typename\n  }\n}\n"}
 
-  响应（license_serial字段是cloudtower序列号，写入规划表）
+  响应（license_serial字段是cloudtower序列号，写入规划表 集群管理信息 sheet 的 M3 格）
   {
       "data": {
           "deploys": [

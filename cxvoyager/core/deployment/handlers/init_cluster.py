@@ -26,7 +26,7 @@ from urllib.parse import urlparse
 
 from cxvoyager.core.deployment.stage_manager import Stage, stage_handler, raise_if_aborted
 from cxvoyager.core.deployment.runtime_context import RunContext
-from cxvoyager.common.config import load_config
+from cxvoyager.common.config import load_config, DEFAULT_PREINIT_TOKEN_KEY
 from cxvoyager.common.system_constants import DEFAULT_CONFIG_FILE
 from cxvoyager.integrations.excel.planning_sheet_parser import parse_plan
 from cxvoyager.core.deployment.host_discovery_scanner import get_host_scan_defaults, scan_hosts
@@ -62,6 +62,7 @@ def handle_init_cluster(ctx_dict):
             return fallback
 
     token = api_cfg.get('x-smartx-token')
+    preinit_token = api_cfg.get('default-x-smartx-token') or api_cfg.get(DEFAULT_PREINIT_TOKEN_KEY) or token
     base_url = api_cfg.get('base_url')
     timeout = api_cfg.get('timeout')
     if timeout is None:
@@ -98,7 +99,7 @@ def handle_init_cluster(ctx_dict):
     else:
         host_info, warnings = scan_hosts(
             ctx.plan,
-            token=token,
+            token=preinit_token,
             timeout=timeout,
             max_retries=max_retries,
             base_url=base_url,
@@ -154,7 +155,7 @@ def handle_init_cluster(ctx_dict):
     deploy_response = _trigger_cluster_deployment(
         payload=deploy_payload_dict,
         host_info=host_info,
-        token=token,
+        token=preinit_token,
         timeout=timeout,
         base_url_override=base_url,
         use_mock=use_mock,
@@ -182,7 +183,7 @@ def handle_init_cluster(ctx_dict):
 
     verify_response = _wait_for_deployment_completion(
         host_info=host_info,
-        token=token,
+        token=preinit_token,
         timeout=timeout,
         base_url_override=base_url,
         use_mock=use_mock,

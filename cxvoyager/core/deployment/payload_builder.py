@@ -517,50 +517,53 @@ class DeploymentPayloadGenerator:
             })
         
         # 构建磁盘配置
-        disks = self._build_host_disks(scan_data.get("disks", []))
+        disk_result = self._build_host_disks_with_flags(scan_data.get("disks", []), host)
+        disks = disk_result["disks"]
         
         # 判断是否为主节点
         total_hosts = len(self.plan.hosts)
         is_master = index < 3 if total_hosts < 5 else index < 5
-        
-        # 检查是否启用分层存储
-        with_faster_ssd_as_cache = self._check_tiered_storage_enabled() and self._has_cache_disks(disks)
-        
+
         return {
             "host_ip": host_ip,
             "host_uuid": host_uuid,
             "hostname": host.SMTX主机名 or f"node-{index + 1:02d}",
-            "disk_data_with_cache": False,  # 固定为false
+            "disk_data_with_cache": disk_result["disk_data_with_cache"],
             "host_passwords": host_passwords,
             "tags": [],
             "ifaces": host_ifaces,
             "disks": disks,
             "is_master": is_master,
-            "with_faster_ssd_as_cache": with_faster_ssd_as_cache
+            "with_faster_ssd_as_cache": disk_result["with_faster_ssd_as_cache"],
         }
     
-    def _build_host_disks(self, disks_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """构建主机磁盘配置"""
-        disks = []
+    def _build_host_disks_with_flags(self, disks_data: List[Dict[str, Any]], host) -> Dict[str, Any]:
+        """构建主机磁盘配置并返回分层相关标记。"""
+        disks: List[Dict[str, Any]] = []
         allowed_functions = {"smtx_system", "data", "cache"}
-        
+
         for disk_data in disks_data:
             function_raw = str(disk_data.get("function", "data") or "data").lower()
             if function_raw not in allowed_functions:
                 logger.debug("忽略不支持的磁盘功能 %s: %s", function_raw, disk_data)
                 continue
-
+            disk_type = str(disk_data.get("type", "HDD")).upper()
             disk = {
                 "drive": disk_data.get("drive") or disk_data.get("name", "unknown"),
                 "function": function_raw,
                 "model": disk_data.get("model", "Unknown Model"),
                 "serial": disk_data.get("serial", "Unknown Serial"),
                 "size": disk_data.get("size") or (disk_data.get("size_gb", 0) * 1024 * 1024 * 1024),
-                "type": disk_data.get("type", "HDD").upper()
+                "type": disk_type,
             }
             disks.append(disk)
-        
-        return disks
+
+        assigned, flags = self._assign_disk_roles_by_architecture(disks, host)
+        return {
+            "disks": assigned,
+            "disk_data_with_cache": flags["disk_data_with_cache"],
+            "with_faster_ssd_as_cache": flags["with_faster_ssd_as_cache"],
+        }
     
     def _build_ntp_config(self) -> Dict[str, Any]:
         """构建NTP配置"""
@@ -569,27 +572,187 @@ class DeploymentPayloadGenerator:
             "ntp_server": None,
             "current_time": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         }
+
+    def _get_cluster_function_tokens(self) -> List[str]:
+        """从规划表解析结果中提取集群功能设置并拆分为 token 列表。"""
+        raw: Any = None
+        if isinstance(self.parsed_plan, dict):
+            hosts_section = self.parsed_plan.get("hosts", {})
+            if isinstance(hosts_section, dict):
+                extra = hosts_section.get("extra", {})
+                if isinstance(extra, dict):
+                    raw = extra.get("cluster_function")
+
+            if raw is None:
+                variables = self.parsed_plan.get("variables", {})
+                if isinstance(variables, dict):
+                    raw = variables.get("CLUSTER_FUNCTION")
+
+        if raw is None:
+            return []
+
+        if isinstance(raw, bool):
+            return ["true"] if raw else ["false"]
+        if isinstance(raw, (int, float)):
+            return [str(raw).lower()]
+
+        text = str(raw).strip()
+        if not text:
+            return []
+
+        return [t for t in re.split(r"[+,;，、/\\|\s]+", text.lower()) if t]
     
     def _get_vhost_enabled(self) -> bool:
         """获取vhost功能开关状态"""
-        # TODO: 从规划表读取集群功能选项
-        # 目前返回默认值true
-        return True
-    
+        tokens = self._get_cluster_function_tokens()
+        if not tokens:
+            return False
+        return any("boost" in tok for tok in tokens)
+
     def _get_rdma_enabled(self) -> bool:
         """获取RDMA功能开关状态"""
-        # TODO: 从规划表读取集群功能选项
-        # 目前返回默认值false
-        return False
-    
+        tokens = self._get_cluster_function_tokens()
+        if not tokens:
+            return False
+        return any("rdma" in tok for tok in tokens)
+
+    def _get_storage_architecture(self) -> str:
+        """获取存储架构配置，默认使用混闪分层。"""
+        def _normalize(raw: Any) -> str:
+            text = str(raw or "").strip().lower()
+            if not text:
+                return "mixed_tier"
+            if "全闪" in text or ("all" in text and "flash" in text) or "不分层" in text or "non" in text:
+                return "all_flash_non_tier"
+            if "混" in text or "tier" in text or "分层" in text:
+                return "mixed_tier"
+            return "mixed_tier"
+
+        if getattr(self.plan, "storage_architecture", None):
+            return _normalize(self.plan.storage_architecture)
+
+        if isinstance(self.parsed_plan, dict):
+            hosts_section = self.parsed_plan.get("hosts", {})
+            extra = hosts_section.get("extra", {}) if isinstance(hosts_section, dict) else {}
+            if isinstance(extra, dict) and extra.get("storage_architecture"):
+                return _normalize(extra.get("storage_architecture"))
+            variables = self.parsed_plan.get("variables", {})
+            if isinstance(variables, dict) and variables.get("STORAGE_ARCHITECTURE"):
+                return _normalize(variables.get("STORAGE_ARCHITECTURE"))
+
+        return "mixed_tier"
+
     def _check_tiered_storage_enabled(self) -> bool:
-        """检查是否启用分层存储"""
-        # TODO: 从规划表读取分层存储配置
-        return True
-    
+        """检查是否启用分层存储。混闪分层返回 True，全闪不分层返回 False。"""
+        return self._get_storage_architecture() == "mixed_tier"
+
     def _has_cache_disks(self, disks: List[Dict[str, Any]]) -> bool:
-        """检查是否有缓存盘"""
+        """检查是否有缓存盘，非分层模式下直接返回 False。"""
+        if self._get_storage_architecture() != "mixed_tier":
+            return False
         return any(disk.get("function") == "cache" for disk in disks)
+
+    def _assign_disk_roles_by_architecture(self, disks: List[Dict[str, Any]], host) -> tuple[List[Dict[str, Any]], Dict[str, bool]]:
+        """根据存储架构将非系统盘分配为 cache/data，并计算标记。
+
+        规则：
+        - 全 SSD（含小/大容量），分层/不分层：全部 data，disk_data_with_cache/with_faster 均为 True。
+        - SSD+HDD，分层：SSD->cache，HDD->data，disk_data_with_cache False，with_faster True；不分层报错。
+        - NVMe+SSD，分层：NVMe->cache，SSD->data，disk_data_with_cache False，with_faster True；不分层报错。
+        - NVMe+HDD，分层：NVMe->cache，HDD->data，disk_data_with_cache False，with_faster True；不分层报错。
+        - 全 HDD：报错。
+        - 纯 NVMe：视为全 SSD，全部 data，disk_data_with_cache/with_faster True。
+        - 混合 NVMe+SSD+HDD（未明确列出）：NVMe->cache，其余 data，disk_data_with_cache False，with_faster True。
+        """
+
+        arch = self._get_storage_architecture()
+
+        def _is_nvme(d: Dict[str, Any]) -> bool:
+            drive_name = str(d.get("drive") or "").upper()
+            disk_type = str(d.get("type") or "").upper()
+            return "NVME" in drive_name or "NVME" in disk_type
+
+        non_system = [d for d in disks if d.get("function") != "smtx_system"]
+        if not non_system:
+            raise ValueError(
+                f"主机 {getattr(host, '管理地址', '') or getattr(host, 'SMTX主机名', '?')} 未发现非系统盘 / "
+                "No non-system disks detected on host."
+            )
+
+        has_hdd = any("HDD" in str(d.get("type", "")).upper() for d in non_system)
+        has_nvme = any(_is_nvme(d) for d in non_system)
+        has_ssd = any("SSD" in str(d.get("type", "")).upper() for d in non_system)
+        # SSD（不含 NVMe 专属判断）
+        has_plain_ssd = any("SSD" in str(d.get("type", "")).upper() and not _is_nvme(d) for d in non_system)
+
+        # 全部 HDD -> 直接报错
+        if has_hdd and not has_ssd and not has_nvme:
+            raise ValueError(
+                "检测到全部为 HDD，无法生成部署载荷，请改用含 SSD/NVMe 的分层架构 / "
+                "All disks are HDD. Please switch to a tiered plan with SSD/NVMe."
+            )
+
+        if arch == "all_flash_non_tier":
+            # 任何 HDD 均不允许
+            if has_hdd:
+                raise ValueError(
+                    "存储架构为全闪不分层，但检测到 HDD，请调整规划表或选择分层架构 / "
+                    "All-flash non-tier selected but HDD found; adjust plan or use tiered."
+                )
+            # 纯 NVMe 或纯/混合 SSD 均作为 data
+            for d in non_system:
+                d["function"] = "data"
+            return disks, {"disk_data_with_cache": True, "with_faster_ssd_as_cache": True}
+
+        # 以下为分层逻辑
+        # 纯 NVMe -> 视为全 SSD，全 data
+        if has_nvme and not has_plain_ssd and not has_hdd:
+            for d in non_system:
+                d["function"] = "data"
+            return disks, {"disk_data_with_cache": True, "with_faster_ssd_as_cache": True}
+
+        # NVMe + SSD（无 HDD）：NVMe 做 cache，SSD 做 data
+        if has_nvme and has_plain_ssd and not has_hdd:
+            for d in non_system:
+                if _is_nvme(d):
+                    d["function"] = "cache"
+                else:
+                    d["function"] = "data"
+            return disks, {"disk_data_with_cache": False, "with_faster_ssd_as_cache": True}
+
+        # NVMe + HDD（可混合 SSD）
+        if has_nvme and has_hdd:
+            for d in non_system:
+                if _is_nvme(d):
+                    d["function"] = "cache"
+                else:
+                    d["function"] = "data"
+            return disks, {"disk_data_with_cache": False, "with_faster_ssd_as_cache": True}
+
+        # SSD + HDD（无 NVMe）
+        if has_plain_ssd and has_hdd:
+            for d in non_system:
+                if "SSD" in str(d.get("type", "")).upper():
+                    d["function"] = "cache"
+                else:
+                    d["function"] = "data"
+            return disks, {"disk_data_with_cache": False, "with_faster_ssd_as_cache": True}
+
+        # 全 SSD（无 HDD，无 NVMe 特殊判定）
+        if has_plain_ssd and not has_hdd and not has_nvme:
+            for d in non_system:
+                d["function"] = "data"
+            return disks, {"disk_data_with_cache": True, "with_faster_ssd_as_cache": True}
+
+        # 覆盖未明确列出的混合场景：最快的(NVMe)->cache，其余 data
+        for d in non_system:
+            if _is_nvme(d):
+                d["function"] = "cache"
+            elif "SSD" in str(d.get("type", "")).upper():
+                d["function"] = "cache"
+            else:
+                d["function"] = "data"
+        return disks, {"disk_data_with_cache": False, "with_faster_ssd_as_cache": True}
     
 def generate_deployment_payload(
     plan: PlanModel,

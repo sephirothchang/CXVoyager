@@ -117,10 +117,9 @@ HOST_CLUSTER_NAME = register_variable("HOST_CLUSTER_NAME", "主机规划", "C3",
 CLUSTER_VIP = register_variable("CLUSTER_VIP", "主机规划", "I19", "集群 VIP")
 CLUSTER_FUNCTION = register_variable("CLUSTER_FUNCTION", "主机规划", "O19", "集群功能")
 FISHEYE_ADMIN_USER = register_variable("FISHEYE_ADMIN_USER", "主机规划", "L19", "Fisheye 集群管理员用户名", default="root")
-FISHEYE_ADMIN_PASSWORD = register_variable(
-    "FISHEYE_ADMIN_PASSWORD", "主机规划", "M19", "Fisheye 集群管理员密码", default="HC!r0cks"
-)
+FISHEYE_ADMIN_PASSWORD = register_variable("FISHEYE_ADMIN_PASSWORD", "主机规划", "M19", "Fisheye 集群管理员密码", default="HC!r0cks")
 CLUSTER_SERIAL = register_variable("CLUSTER_SERIAL", "主机规划", "E19", "集群序列号")
+STORAGE_ARCHITECTURE = register_variable("STORAGE_ARCHITECTURE","主机规划","Q19","存储架构（混闪-分层 / 全闪-不分层）",default="混闪-分层")
 
 HOST_MAX = 16
 HOST_ROW_RANGE = range(3, 3 + HOST_MAX)
@@ -175,9 +174,9 @@ CLOUDTOWER_IP = register_variable("CLOUDTOWER_IP", "集群管理信息", "E3", "
 CLOUDTOWER_ROOT_PASSWORD = register_variable(
     "CLOUDTOWER_ROOT_PASSWORD", "集群管理信息", "G3", "CloudTower web 管理员 root 密码", default="HC!r0cks"
 )
-CLOUDTOWER_SERIAL = register_variable("CLOUDTOWER_SERIAL", "集群管理信息", "M4", "CloudTower 序列号")
+CLOUDTOWER_SERIAL = register_variable("CLOUDTOWER_SERIAL", "集群管理信息", "M3", "CloudTower 序列号")
 OBS_IP = register_variable("OBS_IP", "集群管理信息", "E4", "OBS IP")
-OBS_SERIAL = register_variable("OBS_SERIAL", "集群管理信息", "M5", "OBS 序列号")
+OBS_SERIAL = register_variable("OBS_SERIAL", "集群管理信息", "M4", "OBS 序列号")
 BACKUP_IP = register_variable("BACKUP_IP", "集群管理信息", "E5", "备份 IP")
 BACKUP_SERIAL = register_variable("BACKUP_SERIAL", "集群管理信息", "M5", "备份序列号")
 ER_CONTROLLER_CLUSTER_VIP = register_variable(
@@ -304,5 +303,6 @@ __all__ = [
     "TEST_IP_RANGE_END",
     "CLOUDTOWER_ORGANIZATION_NAME",
     "CLOUDTOWER_DATACENTER_NAME",
+    "STORAGE_ARCHITECTURE",
 ]
 

@@ -1,0 +1,21 @@
+# CXVoyager Copilot 指引
+- 使命：基于规划表的分阶段自动化部署 SmartX 集群；整体架构见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 与流程总览 [docs/WORKFLOW_OVERVIEW.md](docs/WORKFLOW_OVERVIEW.md)。
+- 分层：核心业务在 [cxvoyager/core](cxvoyager/core)（部署/校验），外部适配在 [cxvoyager/integrations](cxvoyager/integrations)，通用基础在 [cxvoyager/common](cxvoyager/common)，CLI/Web 暴露在 [cxvoyager/interfaces](cxvoyager/interfaces)。
+- 阶段引擎：阶段枚举与元数据定义于 [cxvoyager/core/deployment/stage_manager.py](cxvoyager/core/deployment/stage_manager.py)，处理器位于 [cxvoyager/core/deployment/handlers](cxvoyager/core/deployment/handlers)，用 `@stage_handler(Stage.<name>)` 注册；长耗时任务需定期调用 `raise_if_aborted` 尊重终止信号。
+- 入口：交互式启动器 [main.py](main.py) 提供 CLI/Web/离线安装；`python -m cxvoyager` 走同样菜单（见 [cxvoyager/__main__.py](cxvoyager/__main__.py)）；通过环境变量 `CXVOYAGER_LANG` 切换中英文。
+- CLI（Typer）见 [cxvoyager/interfaces/cli/app.py](cxvoyager/interfaces/cli/app.py)：`parse`（规划表摘要）、`check`（解析+校验+载荷可用性，可 `--no-scan`）、`run`（执行阶段，支持 `--dry-run/--strict-validation/--debug`）、`scan`（主机硬件信息）；默认阶段列表 `prepare,init_cluster,deploy_obs`，支持序号/范围解析。
+- 工作流阶段：`prepare, init_cluster, config_cluster, deploy_cloudtower, attach_cluster, cloudtower_config, check_cluster_healthy, deploy_obs, deploy_bak, deploy_er, deploy_sfs, deploy_sks, create_test_vms, perf_reliability, cleanup`；流程图见 [docs/WORKFLOW_FLOW.md](docs/WORKFLOW_FLOW.md)。
+- 规划表：根目录模糊匹配 `SmartX超融合/规划设计表/ELF环境` 自动定位；字段坐标与变量映射在 [cxvoyager/integrations/excel/field_variables.py](cxvoyager/integrations/excel/field_variables.py)；中文表头与合并单元格需清洗，解析结果写入 `ctx.plan` 与 `ctx.extra['parsed_plan']`。
+- 配置：默认值位于 [cxvoyager/common/config/default.yml](cxvoyager/common/config/default.yml)，控制日志级别/调试、dry-run、严格校验、SmartX API token/base URL、主机扫描超时/重试、部署轮询间隔与次数、CloudTower 上传与巡检设置；`CXVOYAGER_API_TOKEN`、`CXVOYAGER_API_BASE_URL` 等环境变量可覆盖，CLI 选项在 `deployment_executor` 合并。
+- 离线依赖：用 `python scripts/prepare_offline_installation_packages.py` 下载到 [cxvoyager/common/resources/offline_packages](cxvoyager/common/resources/offline_packages)；启动器“安装依赖”选项调用 pip 离线安装，依赖清单见 [requirements.txt](requirements.txt)。
+- Web 控制台：`uvicorn cxvoyager.interfaces.web.web_server:app --reload --port 8000` 或启动器菜单 2；接口文档 `/docs`；任务持久化于 `logs/web_tasks.json`，重启会恢复。
+- 日志：主日志 [logs/cxvoyager.log](logs/cxvoyager.log)，阶段日志 `logs/stage_<stage>.log`；CLI `--debug` 或配置 `logging.debug` 提升输出。
+- 构件：部署载荷与上传文件存放于 [artifacts](artifacts)；阶段产物缓存在 `ctx.extra`（如 host_scan、deploy_payload、deploy_results、deploy_cloudtower、attach_cluster），供后续阶段复用。
+- 测试：`pytest -q`；`tests` 涵盖 API 客户端头/日志、集群接入与配置、载荷生成等；`test_payload_generator` 目前会触发 PytestReturnNotNoneWarning。
+- 打包/发布：脚本位于 [scripts](scripts)（如 `package_application_for_release.py`、`prepare_offline_installation_packages.py`、`run_deployment_workflow_test.py`），优先复用而非手写命令。
+- 数据流契约：`run_stages` 在线程上下文传递 `RunContext`（含 plan/config/work_dir/extra），处理器应读取上游 `ctx.extra` 键而非重复解析。
+- 异常与重试：SmartX/CloudTower 调用按网络请求处理，配置驱动重试；4xx 要给出可行动提示，保留日志与构件便于追溯，不要静默吞异常。
+- 代码规范：新增常量/配置请放 `common/config`，共享模型放 `models`，避免魔法字符串；遵循命名约定见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+- 新增阶段或 API 时，请同步更新 [cxvoyager/core/deployment/stage_manager.py](cxvoyager/core/deployment/stage_manager.py) 的 Stage 元数据与 [docs](docs) 下对应 Step_XX 文档。
+- 运行目录：CLI 会通过 `_ensure_cwd_repo_root` 自动 chdir 到仓库根；脚本也应从仓库根运行或使用 `_detect_project_root` 自动探测。
+- Dry-run 友好：部署上传/提交阶段需尊重配置 `deploy.dry_run` 与 CLI 覆盖，`deploy_*` 处理器即便跳过真实上传也应在 `ctx.extra['deploy_results']` 记录预览结果。

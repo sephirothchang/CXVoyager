@@ -27,6 +27,7 @@ from ..system_constants import DEFAULT_CONFIG_FILE
 
 
 DEFAULT_SMARTX_TOKEN = "e79b85fc18b7402fbcc0391fe8d7d24c"
+DEFAULT_PREINIT_TOKEN_KEY = "default-x-smartx-token"
 
 
 class Config(dict):
@@ -72,6 +73,7 @@ def _load_env_overrides() -> Dict[str, Any]:
     token = _pick_env("CXVOYAGER_API_TOKEN", "SMARTX_TOKEN", "X_SMARTX_TOKEN")
     if token:
         overrides.setdefault("api", {})["x-smartx-token"] = token
+        overrides.setdefault("api", {})[DEFAULT_PREINIT_TOKEN_KEY] = token
 
     base_url = _pick_env("CXVOYAGER_API_BASE_URL", "SMARTX_API_BASE_URL")
     if base_url:
@@ -117,6 +119,7 @@ def _normalize_api_token(data: Dict[str, Any] | None) -> Dict[str, Any]:
         token_value = legacy or DEFAULT_SMARTX_TOKEN
 
     api_cfg["x-smartx-token"] = token_value
+    api_cfg.setdefault(DEFAULT_PREINIT_TOKEN_KEY, DEFAULT_SMARTX_TOKEN)
     api_cfg.pop("token", None)
 
     result["api"] = api_cfg

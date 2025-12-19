@@ -17,16 +17,8 @@
    ```bash
    ./start-linux.sh
    ```
-
-## 使用虚拟环境（推荐）
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python3 main.py
-```
-
-说明：若存在 `.venv/bin/python`，`start-linux.sh` 会自动激活并使用虚拟环境；否则回退系统 `python3` 执行 `main.py`。不同平台请各自维护虚拟环境目录，避免跨平台共用同一 `.venv`。
+4. 按照交互式菜单选择操作（CLI/Web/离线安装等）
+注：建议在联网环境下首次运行，以便下载缺失依赖。
 
 ## 日志与输出
 - 日志位于 `logs/`（如 `cxvoyager.log.*`）。

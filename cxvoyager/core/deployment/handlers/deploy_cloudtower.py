@@ -31,6 +31,8 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 from urllib.parse import urlparse
 
+import openpyxl
+
 from cxvoyager.common.config import load_config
 from cxvoyager.common.system_constants import DEFAULT_CONFIG_FILE
 from cxvoyager.common.network_utils import check_port
@@ -565,6 +567,46 @@ def _ensure_plan_context(ctx: RunContext, stage_logger: LoggerAdapter) -> tuple[
         raise RuntimeError("规划表缺少 mgmt 管理信息，请检查规划表或解析结果。")
 
     return plan_model, parsed_plan
+
+
+def _resolve_plan_path_for_write(ctx: RunContext) -> Optional[Path]:
+    """解析规划表路径，供写回序列号使用。"""
+
+    candidates: List[str] = []
+    plan_obj = getattr(ctx, "plan", None)
+    if plan_obj is not None:
+        source = getattr(plan_obj, "source_file", None)
+        if source:
+            candidates.append(str(source))
+    if isinstance(ctx.extra, dict):
+        extra_source = ctx.extra.get("plan_source")
+        if extra_source:
+            candidates.append(str(extra_source))
+
+    work_dir = ctx.work_dir if isinstance(ctx.work_dir, Path) else Path.cwd()
+    for candidate in candidates:
+        path = Path(candidate)
+        if not path.is_absolute():
+            path = (work_dir / path).resolve()
+        if path.exists():
+            return path
+    return None
+
+
+def _write_cloudtower_serial_to_plan(plan_path: Path, serial: str) -> None:
+    workbook = openpyxl.load_workbook(plan_path)
+    sheet = workbook[plan_vars.CLOUDTOWER_SERIAL.sheet]
+    sheet[plan_vars.CLOUDTOWER_SERIAL.cell] = serial
+    workbook.save(plan_path)
+
+
+def _configure_rack_topology_placeholder(*, ctx: RunContext, stage_logger: LoggerAdapter) -> None:
+    """TODO: 读取机架拓扑表并调用 CloudTower 接口配置机架拓扑。"""
+
+    stage_logger.info(
+        "机架拓扑自动化尚未实装，当前为占位实现",
+        progress_extra={"plan_source": ctx.extra.get('plan_source') if isinstance(ctx.extra, dict) else None},
+    )
 
 
 def _ensure_host_scan_context(
@@ -2142,6 +2184,32 @@ def _configure_cloudtower_post_install(
 
     license_info = _cloudtower_query_license(client=client, stage_logger=stage_logger)
 
+    serial = license_info.get("license_serial") if isinstance(license_info, dict) else None
+    plan_updates: Dict[str, Any] = {}
+    if serial:
+        plan_path = _resolve_plan_path_for_write(ctx)
+        if plan_path:
+            try:
+                _write_cloudtower_serial_to_plan(plan_path, serial)
+            except Exception as exc:  # noqa: BLE001
+                stage_logger.warning(
+                    "写入 CloudTower 序列号到规划表失败",
+                    progress_extra={"path": str(plan_path), "error": str(exc)},
+                )
+                plan_updates["cloudtower_serial"] = {"status": "failed", "error": str(exc)}
+            else:
+                stage_logger.info(
+                    "已在规划表写入 CloudTower 序列号",
+                    progress_extra={
+                        "path": plan_path.name,
+                        "cell": plan_vars.CLOUDTOWER_SERIAL.cell,
+                        "serial": serial,
+                    },
+                )
+                plan_updates["cloudtower_serial"] = {"status": "ok", "path": str(plan_path)}
+        else:
+            stage_logger.warning("未找到规划表路径，CloudTower 序列号未写入规划表")
+
     result = {
         "organization": {
             "id": organization_info.get("id") if isinstance(organization_info, dict) else None,
@@ -2153,6 +2221,8 @@ def _configure_cloudtower_post_install(
         "dns": {"servers": inputs.dns_servers},
         "license": license_info,
     }
+    if plan_updates:
+        result["plan_updates"] = plan_updates
     if setup_status:
         result["setup_status"] = setup_status
 

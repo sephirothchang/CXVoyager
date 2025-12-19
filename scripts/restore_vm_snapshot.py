@@ -78,10 +78,11 @@ DEFAULT_VM_NAMES: List[str] = [
 	"SMTX-AUTO-DEPLOY-HOST-0001",
 	"SMTX-AUTO-DEPLOY-HOST-0002",
 	"SMTX-AUTO-DEPLOY-HOST-0003",
+	"SMTX-AUTO-DEPLOY-HOST-0004",
 ]
 
 # 目标快照名 (可被 --snapshot-name 覆盖)
-DEFAULT_SNAPSHOT_NAME = "OS-Installed"
+DEFAULT_SNAPSHOT_NAME = "SSD+HDD"
 
 # 任务轮询间隔（秒）
 TASK_POLL_INTERVAL = 1.0
@@ -103,6 +104,7 @@ DEFAULT_IP_ASSIGNMENTS: List[str] = [
 	"10.0.20.11",
 	"10.0.20.12",
 	"10.0.20.13",
+	"10.0.20.14",
 ]
 
 
@@ -586,11 +588,17 @@ def main(argv: Optional[List[str]] = None) -> int:
 	else:
 		network_plans = [None for _ in args.vm]
 
+	ssl_ctx = build_ssl_context(args.insecure)
+
+	effective_power_on = args.power_on or args.configure_ip
+	effective_wait_poweron = args.wait_poweron or args.configure_ip
+	effective_insecure = args.insecure or ssl_ctx is None or getattr(ssl_ctx, "check_hostname", False) is False
+
 	default_workers = min(len(args.vm), os.cpu_count() or 4)
 	if default_workers < 1:
 		default_workers = 1
 	worker_count = args.max_workers if args.max_workers and args.max_workers > 0 else default_workers
-	power_required = args.power_on or args.configure_ip
+	power_required = effective_power_on
 	total_steps = calculate_total_steps(power_required, args.configure_ip)
 	rich_available = Console is not None and Progress is not None and Live is not None
 	if rich_available and not args.quiet:
@@ -619,9 +627,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 			left_table.add_row("Server", args.server)
 			left_table.add_row("User", args.user)
 			left_table.add_row("Snapshot", args.snapshot_name)
-			left_table.add_row("忽略证书", str(args.insecure))
-			left_table.add_row("开机", str(args.power_on))
-			left_table.add_row("等待 poweredOn", str(args.wait_poweron))
+			left_table.add_row("忽略证书", str(effective_insecure))
+			left_table.add_row("开启虚拟机电源", str(effective_power_on))
+			left_table.add_row("等待 Power On", str(effective_wait_poweron))
 			left_table.add_row("并发线程", str(worker_count))
 			left_table.add_row("VM 数量", str(len(args.vm)))
 
@@ -660,7 +668,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 			print(f"Server: {args.server}")
 			print(f"User  : {args.user}")
 			print(f"VM 数量: {len(args.vm)} | Snapshot: {args.snapshot_name}")
-			print(f"忽略证书: {args.insecure} | 开机: {args.power_on} (等待: {args.wait_poweron})")
+			print(f"忽略证书(实际): {effective_insecure} | 开机(实际): {effective_power_on} (等待: {effective_wait_poweron})")
 			print(f"并发线程: {worker_count}")
 			if args.configure_ip:
 				ips_preview = ", ".join(args.ip)
@@ -672,8 +680,6 @@ def main(argv: Optional[List[str]] = None) -> int:
 				print()
 			if not rich_available:
 				print("[提示] 可安装 rich 以获得动态进度条: pip install rich\n")
-
-	ssl_ctx = build_ssl_context(args.insecure)
 
 	try:
 		si = connect.SmartConnect(host=args.server, user=args.user, pwd=password, sslContext=ssl_ctx)
