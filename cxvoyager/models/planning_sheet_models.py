@@ -26,6 +26,9 @@ class VirtualNetworkRow(BaseModel):
     subnetwork: Optional[str] = Field(None, description="子网CIDR")
     主机端口: Optional[str] = None
     网口绑定模式: Optional[str] = Field(None, description="active-backup|balance-tcp|balance-slb")
+    vlan_id: Optional[int | str] = None
+    vlan_type: Optional[str] = None
+    gateway: Optional[str] = None
 
 class HostRow(BaseModel):
     集群名称: str

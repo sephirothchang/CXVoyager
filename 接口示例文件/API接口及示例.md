@@ -2214,21 +2214,53 @@ x-smartx-token：d513e36581044eb691ba9589eebac995
   ## 部署OBS
 
   ### 上传Observability安装包
+  
+  第零步，准备cookie
+  通过模拟浏览器的Cloudtower登录接口获取cookie，后续上传安装包时需要使用
+  请求网址
+  https://10.0.20.2/api
+  请求方法
+  POST
+  载荷（密码是经过base64编码后的密码，密码来源于规划表中Cloudtower的管理员密码，默认为HC!r0cks）
+  {"operationName":"login","variables":{"data":{"username":"root","password":"NmQwNTQ2MTI4MDQxMjgzYTk3NDU3OGZmYjk3NmFhNGM6dm40by9nOE0xZ0ZjVmxBSmR2Nmk3QT09","source":"LOCAL","auth_config_id":null}},"query":"mutation login($data: LoginInput!) {\n  login(data: $data, effect: {encoded: true}) {\n    token\n    uid\n    need_mfa\n    mfa_meta {\n      recipient\n      mid\n      type\n      valid\n      __typename\n    }\n    __typename\n  }\n}\n"}
+
+  响应标头（包含后续所需要的cookie信息）
+  set-cookie
+  connect.sid=s%3Acmjkynw9e024p7zud58mscdx7.Lo9ABrnF3eWB3z7TZFin51N2%2Bz9vdi4qq7VmzhYPI7k; Path=/; HttpOnly; Secure; SameSite=Strict; HttpOnly
+  set-cookie
+  path=/; HttpOnly; Secure; SameSite=Strict
+
+  响应体（包含JWT token）
+  {
+    "data": {
+        "login": {
+            "token": "eyJhbGciOiJIUzI1NiJ9.Y21qY293MXcyMDM2aDA5NTg3eDJ5NndtZw.Cx4q7xxVWBtXsyFVhPN0PQ7fgRBdJMjq1Sd2_eEnHbM",
+            "uid": null,
+            "need_mfa": null,
+            "mfa_meta": null,
+            "__typename": "Login"
+        }
+    }
+}
+
+
+  第一步先请求上传接口，获取上传ID
+
   请求网址
   https://10.0.20.2/api/ovm-operator/api/v3/chunkedUploads
   请求方法
   POST
 
-  header
-  Authorization: token（通过cloudtower登录接口获取的token）
+  header（这个接口需要使用Basic认证，用户名和密码为o11y:HC!r0cks，base64编码后是bzExeTpIQyFyMGNrcw==）
+  Authorization: Basic bzExeTpIQyFyMGNrcw==
+  cookie: path=/; path=/; path=/; connect.sid=s%3Acmjkvx3x8000v7zud0gia7h1k.r4B9XtW6EFvHLPV4YN5xT%2FS07Mflgj4Gh9ipqqVM%2FwA
 
   payload（文件名应该为Observability-X86_64-*.tar.gz，如果有多个，取最高版本）
   {"origin_file_name":"Observability-X86_64-v1.4.2-release.20250926-24.tar.gz"}
 
   响应
-  
   {
-    "id": "36ao223edNlQceIC0saWhAXj3lE",
+    "id": "37JudNjModKfSG1mWKbEhx9d4Qa",
     "package_name": "",
     "offset": "0",
     "status": "UPLOADING",
@@ -2240,7 +2272,512 @@ x-smartx-token：d513e36581044eb691ba9589eebac995
     "update_time": "2025-12-09T04:17:12.435063652Z"
 }
 
+
+  第二步，使用返回的ID分片上传安装包
+  请求网址
+  https://10.0.20.2/api/ovm-operator/api/v1/chunkedUploads
+  请求方法
+  POST
+
+  header（这个接口需要使用Basic认证，用户名和密码为o11y:HC!r0cks，base64编码后是bzExeTpIQyFyMGNrcw==）
+  Authorization: Basic bzExeTpIQyFyMGNrcw==
+  content-length: 4194612
+  content-type: ultipart/form-data; boundary=----WebKitFormBoundaryesV20WkYlx2K8Kl3
+  content-encoding
+  gzip
+  content-type
+  text/plain; charset=utf-8
+  cookie: path=/; path=/; path=/; connect.sid=s%3Acmjkvx3x8000v7zud0gia7h1k.r4B9XtW6EFvHLPV4YN5xT%2FS07Mflgj4Gh9ipqqVM%2FwA
+
+  载荷
+  file
+  （二进制）
+  id
+  37JudNjModKfSG1mWKbEhx9d4Qa
+
+  返回
+  {"id":"37JudNjModKfSG1mWKbEhx9d4Qa","offset":4194304,"status":1,"origin_file_name":"Observability-X86_64-v1.4.2-release.20250926-24.tar.gz","create_time":{"seconds":1766633581,"nanos":668054414},"update_time":{"seconds":1766633582,"nanos":390462362}}
+
+
+  第三步，所有分片上传完成后，调用完成接口
+  请求网址(37JudNjModKfSG1mWKbEhx9d4Qa是上传ID,第二步上传时使用的ID,来源是第一步返回结果；commit接口用于通知服务器上传完成)
+  https://10.0.20.2/api/ovm-operator/api/v3/chunkedUploads/37JudNjModKfSG1mWKbEhx9d4Qa:commit
+  请求方法
+  POST
+
+  header（这个接口需要使用Basic认证，用户名和密码为o11y:HC!r0cks，base64编码后是bzExeTpIQyFyMGNrcw==）
+  Authorization: Basic bzExeTpIQyFyMGNrcw==
+  x-user-id:cmjcow1w2036h09587x2y6wmg
+  cookie: path=/; path=/; path=/; connect.sid=s%3Acmjkvx3x8000v7zud0gia7h1k.r4B9XtW6EFvHLPV4YN5xT%2FS07Mflgj4Gh9ipqqVM%2FwA
+
+
+  第四步，验证安装包已上传成功
+  请求网址
+  https://10.0.20.2/api
+  请求方法
+  POST
+
+  header
+  Authorization: token（通过cloudtower登录接口获取的token）
+  cookie: path=/; path=/; path=/; connect.sid=s%3Acmjkvx3x8000v7zud0gia7h1k.r4B9XtW6EFvHLPV4YN5xT%2FS07Mflgj4Gh9ipqqVM%2FwA
+
+  载荷
+  {"operationName":"observabilityInstanceAndApps","variables":{},"query":"query observabilityInstanceAndApps {\n  bundleApplicationPackages {\n    id\n    name\n    version\n    arch\n    application_packages {\n      id\n      architecture\n      version\n      applications {\n        id\n        name\n        __typename\n      }\n      __typename\n    }\n    host_plugin_packages {\n      id\n      arch\n      version\n      __typename\n    }\n    __typename\n  }\n  bundleApplicationInstances {\n    id\n    name\n    status\n    application {\n      id\n      instances {\n        id\n        vm {\n          id\n          status\n          cpu_usage\n          memory_usage\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    vm_spec {\n      ip\n      subnet_mask\n      gateway\n      vlan_id\n      vcpu_count\n      memory_size_bytes\n      storage_size_bytes\n      __typename\n    }\n    description\n    connected_clusters {\n      id\n      name\n      status\n      migration_status\n      cluster {\n        id\n        name\n        hosts {\n          id\n          name\n          __typename\n        }\n        type\n        __typename\n      }\n      host_plugin {\n        id\n        host_plugin_instances\n        __typename\n      }\n      observability_connected_cluster {\n        id\n        traffic_enabled\n        status\n        __typename\n      }\n      __typename\n    }\n    bundle_application_package {\n      id\n      version\n      arch\n      __typename\n    }\n    health_status\n    connected_system_services {\n      id\n      type\n      tenant_id\n      system_service {\n        id\n        name\n        __typename\n      }\n      instances {\n        state\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  bundleApplicationConnectedClusters {\n    id\n    name\n    status\n    migration_status\n    cluster {\n      id\n      name\n      local_id\n      connect_state\n      version\n      type\n      __typename\n    }\n    bundle_application_instance {\n      id\n      name\n      status\n      health_status\n      bundle_application_package {\n        id\n        version\n        __typename\n      }\n      vm_spec {\n        ip\n        __typename\n      }\n      connected_clusters {\n        id\n        name\n        cluster {\n          id\n          local_id\n          name\n          __typename\n        }\n        host_plugin {\n          id\n          host_plugin_instances\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    observability_connected_cluster {\n      id\n      traffic_enabled\n      status\n      __typename\n    }\n    __typename\n  }\n}\n"}
+
+  返回（需要确认bundleApplicationPackages中包含Observability安装包，且版本正确，v1.4.2-release.20250926应与上传包文件名中的对应版本字段匹配）
+  {
+    "data": {
+        "bundleApplicationPackages": [
+            {
+                "id": "cmjkxevr404o20958p420551n",
+                "name": "Observability",
+                "version": "v1.4.2-release.20250926",
+                "arch": "X86_64",
+                "application_packages": [
+                    {
+                        "id": "cmjkxe26b04dh0958qv9ieypw",
+                        "architecture": "X86_64",
+                        "version": "v1.4.2-release.20250926",
+                        "applications": [],
+                        "__typename": "CloudTowerApplicationPackage"
+                    }
+                ],
+                "host_plugin_packages": [
+                    {
+                        "id": "cmjkxeerk04il0958bxwa10oi",
+                        "arch": "X86_64",
+                        "version": "v1.4.2-release.20250926",
+                        "__typename": "HostPluginPackage"
+                    },
+                    {
+                        "id": "cmjkxergl04nl0958slh829io",
+                        "arch": "AARCH64",
+                        "version": "v1.4.2-release.20250926",
+                        "__typename": "HostPluginPackage"
+                    }
+                ],
+                "__typename": "BundleApplicationPackage"
+            }
+        ],
+        "bundleApplicationInstances": [],
+        "bundleApplicationConnectedClusters": []
+    }
+}
+
+
+  ### 等待Observability安装包处理完成
+  https://10.0.20.2/v2/api/get-tasks
+  post
+
+  header
+  Authorization: token（通过cloudtower登录接口获取的token）
+
+  载荷
+  无
+
+  响应类似如下（需要确认有下列两个任务，且状态均为SUCCESSED）
+  {
+        "args": {},
+        "cluster": null,
+        "description": "Create Installation package Observability-X86_64-v1.4.2-release.20250926-24.tar.gz",
+        "error_code": null,
+        "error_message": null,
+        "finished_at": "2025-12-25T06:31:40.000Z",
+        "id": "cmjl27r7x0huh0958br25ouk3",
+        "internal": false,
+        "key": null,
+        "local_created_at": "2025-12-25T06:26:25.000Z",
+        "progress": 0,
+        "resource_id": null,
+        "resource_mutation": "",
+        "resource_rollback_error": null,
+        "resource_rollback_retry_count": null,
+        "resource_rollbacked": null,
+        "resource_type": null,
+        "snapshot": "",
+        "started_at": "2025-12-25T06:26:25.000Z",
+        "status": "SUCCESSED",
+        "steps": [],
+        "type": null,
+        "user": null
+    },
+    {
+        "args": {
+            "Hash": "5c67dcd21a874675b933095ce26153ed2882132f69dfd22966a01c31ec4e235e"
+        },
+        "cluster": null,
+        "description": "Create Application package observability-X86_64-v1.4.2-release.20250926.tar.gz",
+        "error_code": null,
+        "error_message": null,
+        "finished_at": "2025-12-25T06:31:02.000Z",
+        "id": "cmjl2bjf40i1709584fx0fg8q",
+        "internal": false,
+        "key": null,
+        "local_created_at": "2025-12-25T06:29:21.000Z",
+        "progress": 1,
+        "resource_id": "cmjl2dpbr0ia80958fpt5hqgz",
+        "resource_mutation": null,
+        "resource_rollback_error": null,
+        "resource_rollback_retry_count": null,
+        "resource_rollbacked": null,
+        "resource_type": "CloudTowerApplicationPackage",
+        "snapshot": "{\"typename\":\"CloudTowerApplicationPackage\"}",
+        "started_at": "2025-12-25T06:29:21.000Z",
+        "status": "SUCCESSED",
+        "steps": [
+            {
+                "current": 0,
+                "finished": true,
+                "key": "READ_PACKAGE",
+                "per_second": 0,
+                "total": null,
+                "unit": null
+            },
+            {
+                "current": 0,
+                "finished": true,
+                "key": "STORE_IMAGE",
+                "per_second": 0,
+                "total": null,
+                "unit": null
+            },
+            {
+                "current": 0,
+                "finished": true,
+                "key": "CREATE_PACKAGE_RESOURCE",
+                "per_second": 0,
+                "total": null,
+                "unit": null
+            }
+        ],
+        "type": null,
+        "user": {
+            "id": "cmjcojkm201zx09580vmjmbru",
+            "name": "system service"
+        }
+    }
+
+
+
+ 
+
   ### 进行部署
+
+  部署前调用解析模块，对规划表进行解析，获取OBS的IP地址等信息
+
+
+
+  请求网址
+  https://10.0.20.2/api
+  请求方法
+  POST
+
+  header
+  cookie
+  path=/; path=/; connect.sid=s%3Acmjkynw9e024p7zud58mscdx7.Lo9ABrnF3eWB3z7TZFin51N2%2Bz9vdi4qq7VmzhYPI7k
+
+
+
+  载荷
+  （"name":"obs"表示部署实例名称为obs，
+  "bundle_application_package":{"id":"cmjkzx3hy0ack0958emrwoy18"}中的id为Observability安装包ID，通过查询安装包时获取；
+  cluster.id为要部署到的集群ID，通过查询集群时获取；
+  vm_spec中的ip来源自规划表的解析结果，坐标和上下文变量为 OBS_IP = register_variable("OBS_IP", "集群管理信息", "E4", "OBS IP")
+  subnet_mask、gateway来源于规划表解析的管理网络信息，可以参考init脚本中获取管理网络子网掩码和网关的方式，或者部署Cloudtower模块中的类似实现；
+  vlan_id来源于规划表中default虚拟网络所在网络对应的VLAN ID（通过查询网络获取），可以参考部署Cloudtower模块中获取default虚拟网络VLAN ID的实现；
+  vcpu_count、memory_size_bytes和storage_size_bytes是固定值，保持"vcpu_count":16,"memory_size_bytes":"34359738368","storage_size_bytes":"549755813888"不变
+  env_vars中的PRODUCT_VENDOR字段固定为SMARTX）
+
+
+  {"operationName":"createBundleApplicationInstance","variables":{"data":{"name":"obs","description":"","bundle_application_package":{"id":"cmjkzx3hy0ack0958emrwoy18"},"cluster":{"id":"cmjcow5a1038u09588mxmnop7"},"host_id":"","vm_spec":{"ip":"10.0.20.3","subnet_mask":"255.255.255.0","gateway":"10.0.20.1","vlan_id":"cmjcow96r000lqrqalh84y2nd","vcpu_count":16,"memory_size_bytes":"34359738368","storage_size_bytes":"549755813888","env_vars":{"PRODUCT_VENDOR":"SMARTX"}}}},"query":"mutation createBundleApplicationInstance($data: BundleApplicationInstanceCreateInput!) {\n  createBundleApplicationInstance(data: $data) {\n    id\n    __typename\n  }\n}\n"}
+
+  响应
+  {
+    "data": {
+        "createBundleApplicationInstance": {
+            "id": "cmjl01uap0ap40958kidyhmr9",
+            "__typename": "BundleApplicationInstance"
+        }
+    }
+}
+
+
+  ### 验证部署结果
+  请求网址
+  https://10.0.20.2/api
+  请求方法
+  POST
+
+  header
+  cookie
+  path=/; path=/; connect.sid=s%3Acmjkynw9e024p7zud58mscdx7.Lo9ABrnF3eWB3z7TZFin51N2%2Bz9vdi4qq7VmzhYPI7k
+
+
+  载荷
+  {"operationName":"observabilityInstanceAndApps","variables":{},"query":"query observabilityInstanceAndApps {\n  bundleApplicationPackages {\n    id\n    name\n    version\n    arch\n    application_packages {\n      id\n      architecture\n      version\n      applications {\n        id\n        name\n        __typename\n      }\n      __typename\n    }\n    host_plugin_packages {\n      id\n      arch\n      version\n      __typename\n    }\n    __typename\n  }\n  bundleApplicationInstances {\n    id\n    name\n    status\n    application {\n      id\n      instances {\n        id\n        vm {\n          id\n          status\n          cpu_usage\n          memory_usage\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    vm_spec {\n      ip\n      subnet_mask\n      gateway\n      vlan_id\n      vcpu_count\n      memory_size_bytes\n      storage_size_bytes\n      __typename\n    }\n    description\n    connected_clusters {\n      id\n      name\n      status\n      migration_status\n      cluster {\n        id\n        name\n        hosts {\n          id\n          name\n          __typename\n        }\n        type\n        __typename\n      }\n      host_plugin {\n        id\n        host_plugin_instances\n        __typename\n      }\n      observability_connected_cluster {\n        id\n        traffic_enabled\n        status\n        __typename\n      }\n      __typename\n    }\n    bundle_application_package {\n      id\n      version\n      arch\n      __typename\n    }\n    health_status\n    connected_system_services {\n      id\n      type\n      tenant_id\n      system_service {\n        id\n        name\n        __typename\n      }\n      instances {\n        state\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  bundleApplicationConnectedClusters {\n    id\n    name\n    status\n    migration_status\n    cluster {\n      id\n      name\n      local_id\n      connect_state\n      version\n      type\n      __typename\n    }\n    bundle_application_instance {\n      id\n      name\n      status\n      health_status\n      bundle_application_package {\n        id\n        version\n        __typename\n      }\n      vm_spec {\n        ip\n        __typename\n      }\n      connected_clusters {\n        id\n        name\n        cluster {\n          id\n          local_id\n          name\n          __typename\n        }\n        host_plugin {\n          id\n          host_plugin_instances\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    observability_connected_cluster {\n      id\n      traffic_enabled\n      status\n      __typename\n    }\n    __typename\n  }\n}\n"}
+
+  响应类型1，正在安装中（需要确认bundleApplicationInstances中包含刚刚部署的obs实例，"id": "cmjl01uap0ap40958kidyhmr9"是部署时返回响应中的ID，状态为INSTALLING则为部署中，需要等待）
+  {
+    "data": {
+        "bundleApplicationPackages": [
+            {
+                "id": "cmjkzx3hy0ack0958emrwoy18",
+                "name": "Observability",
+                "version": "v1.4.2-release.20250926",
+                "arch": "X86_64",
+                "application_packages": [
+                    {
+                        "id": "cmjkzw6qf0a0k0958hfmiqvwe",
+                        "architecture": "X86_64",
+                        "version": "v1.4.2-release.20250926",
+                        "applications": [],
+                        "__typename": "CloudTowerApplicationPackage"
+                    }
+                ],
+                "host_plugin_packages": [
+                    {
+                        "id": "cmjkzwk0n0a6p0958yui4tdyr",
+                        "arch": "X86_64",
+                        "version": "v1.4.2-release.20250926",
+                        "__typename": "HostPluginPackage"
+                    },
+                    {
+                        "id": "cmjkzwz700ac40958c96in94w",
+                        "arch": "AARCH64",
+                        "version": "v1.4.2-release.20250926",
+                        "__typename": "HostPluginPackage"
+                    }
+                ],
+                "__typename": "BundleApplicationPackage"
+            }
+        ],
+        "bundleApplicationInstances": [
+            {
+                "id": "cmjl01uap0ap40958kidyhmr9",
+                "name": "obs",
+                "status": "INSTALLING",
+                "application": {
+                    "id": "cmjl01uaf0aov09585hcpo94w",
+                    "instances": [],
+                    "__typename": "CloudTowerApplication"
+                },
+                "vm_spec": {
+                    "ip": "10.0.20.3",
+                    "subnet_mask": "255.255.255.0",
+                    "gateway": "10.0.20.1",
+                    "vlan_id": "cmjcow96r000lqrqalh84y2nd",
+                    "vcpu_count": 16,
+                    "memory_size_bytes": "34359738368",
+                    "storage_size_bytes": "549755813888",
+                    "__typename": "BundleApplicationInstanceVmSpec"
+                },
+                "description": "",
+                "connected_clusters": [],
+                "bundle_application_package": {
+                    "id": "cmjkzx3hy0ack0958emrwoy18",
+                    "version": "v1.4.2-release.20250926",
+                    "arch": "X86_64",
+                    "__typename": "BundleApplicationPackage"
+                },
+                "health_status": null,
+                "connected_system_services": [],
+                "__typename": "BundleApplicationInstance"
+            }
+        ],
+        "bundleApplicationConnectedClusters": []
+    }
+}
+
+
+响应类型2，部署成功（"status": "SUCCESS",且vm状态为RUNNING，说明部署成功，可以进行下一步）
+{
+    "data": {
+        "bundleApplicationPackages": [
+            {
+                "id": "cmjkzx3hy0ack0958emrwoy18",
+                "name": "Observability",
+                "version": "v1.4.2-release.20250926",
+                "arch": "X86_64",
+                "application_packages": [
+                    {
+                        "id": "cmjkzw6qf0a0k0958hfmiqvwe",
+                        "architecture": "X86_64",
+                        "version": "v1.4.2-release.20250926",
+                        "applications": [
+                            {
+                                "id": "cmjl01uaf0aov09585hcpo94w",
+                                "name": "observability-obs",
+                                "__typename": "CloudTowerApplication"
+                            }
+                        ],
+                        "__typename": "CloudTowerApplicationPackage"
+                    }
+                ],
+                "host_plugin_packages": [
+                    {
+                        "id": "cmjkzwk0n0a6p0958yui4tdyr",
+                        "arch": "X86_64",
+                        "version": "v1.4.2-release.20250926",
+                        "__typename": "HostPluginPackage"
+                    },
+                    {
+                        "id": "cmjkzwz700ac40958c96in94w",
+                        "arch": "AARCH64",
+                        "version": "v1.4.2-release.20250926",
+                        "__typename": "HostPluginPackage"
+                    }
+                ],
+                "__typename": "BundleApplicationPackage"
+            }
+        ],
+        "bundleApplicationInstances": [
+            {
+                "id": "cmjl01uap0ap40958kidyhmr9",
+                "name": "obs",
+                "status": "SUCCESS",
+                "application": {
+                    "id": "cmjl01uaf0aov09585hcpo94w",
+                    "instances": [
+                        {
+                            "id": "cmjl060uc0bde0958r4asmm66",
+                            "vm": {
+                                "id": "cmjl060u70bdd0958vq8wg5q2",
+                                "status": "RUNNING",
+                                "cpu_usage": 0.68,
+                                "memory_usage": 5.54,
+                                "__typename": "Vm"
+                            },
+                            "__typename": "CloudTowerApplicationInstance"
+                        }
+                    ],
+                    "__typename": "CloudTowerApplication"
+                },
+                "vm_spec": {
+                    "ip": "10.0.20.3",
+                    "subnet_mask": "255.255.255.0",
+                    "gateway": "10.0.20.1",
+                    "vlan_id": "cmjcow96r000lqrqalh84y2nd",
+                    "vcpu_count": 16,
+                    "memory_size_bytes": "34359738368",
+                    "storage_size_bytes": "549755813888",
+                    "__typename": "BundleApplicationInstanceVmSpec"
+                },
+                "description": "",
+                "connected_clusters": [],
+                "bundle_application_package": {
+                    "id": "cmjkzx3hy0ack0958emrwoy18",
+                    "version": "v1.4.2-release.20250926",
+                    "arch": "X86_64",
+                    "__typename": "BundleApplicationPackage"
+                },
+                "health_status": "NORMAL",
+                "connected_system_services": [],
+                "__typename": "BundleApplicationInstance"
+            }
+        ],
+        "bundleApplicationConnectedClusters": []
+    }
+}
+
+  ### 关联集群
+
+  请求网址
+  https://10.0.20.2/api
+  请求方法
+  POST
+
+  header
+  cookie
+  path=/; path=/; connect.sid=s%3Acmjkynw9e024p7zud58mscdx7.Lo9ABrnF3eWB3z7TZFin51N2%2Bz9vdi4qq7VmzhYPI7k
+
+  载荷（将部署好的obs实例关联到集群上，"id":"cmjl01uap0ap40958kidyhmr9"是obs的实例ID，"id_in":["cmjcow5a1038u09588mxmnop7"]是待关联到obs的集群id，通过调用查询集群模块query_cluster实现获取id）
+  {"operationName":"updateBundleApplicationInstanceConnectClusters","variables":{"where":{"id":"cmjl01uap0ap40958kidyhmr9"},"data":{"connected_clusters":{"id_in":["cmjcow5a1038u09588mxmnop7"]}}},"query":"mutation updateBundleApplicationInstanceConnectClusters($where: BundleApplicationInstanceWhereInput!, $data: BundleApplicationInstanceConnectClustersInput!) {\n  updateBundleApplicationInstanceConnectClusters(where: $where, data: $data) {\n    id\n    name\n    description\n    status\n    error_code\n    vm_spec {\n      ip\n      subnet_mask\n      gateway\n      vlan_id\n      vcpu_count\n      memory_size_bytes\n      storage_size_bytes\n      __typename\n    }\n    connected_clusters {\n      id\n      name\n      cluster {\n        id\n        name\n        __typename\n      }\n      __typename\n    }\n    cluster {\n      id\n      name\n      __typename\n    }\n    __typename\n  }\n}\n"}
+
+  响应
+  {
+    "data": {
+        "updateBundleApplicationInstanceConnectClusters": {
+            "id": "cmjl01uap0ap40958kidyhmr9",
+            "name": "obs",
+            "description": "",
+            "status": "SUCCESS",
+            "error_code": "",
+            "vm_spec": {
+                "ip": "10.0.20.3",
+                "subnet_mask": "255.255.255.0",
+                "gateway": "10.0.20.1",
+                "vlan_id": "cmjcow96r000lqrqalh84y2nd",
+                "vcpu_count": 16,
+                "memory_size_bytes": "34359738368",
+                "storage_size_bytes": "549755813888",
+                "__typename": "BundleApplicationInstanceVmSpec"
+            },
+            "connected_clusters": [
+                {
+                    "id": "cmjl19lny0emi0958sn65ah7o",
+                    "name": "CN-BJ-SMTX-Prod-Cls01",
+                    "cluster": {
+                        "id": "cmjcow5a1038u09588mxmnop7",
+                        "name": "CN-BJ-SMTX-Prod-Cls01",
+                        "__typename": "Cluster"
+                    },
+                    "__typename": "BundleApplicationConnectedCluster"
+                }
+            ],
+            "cluster": {
+                "id": "cmjcow5a1038u09588mxmnop7",
+                "name": "CN-BJ-SMTX-Prod-Cls01",
+                "__typename": "Cluster"
+            },
+            "__typename": "BundleApplicationInstance"
+        }
+    }
+}
+
+  ### 关联Cloudtower系统服务
+  请求网址
+  https://10.0.20.2/api
+  请求方法
+  POST
+
+  header
+  cookie
+  path=/; path=/; connect.sid=s%3Acmjkynw9e024p7zud58mscdx7.Lo9ABrnF3eWB3z7TZFin51N2%2Bz9vdi4qq7VmzhYPI7k
+
+
+  载荷（只有url:"http://10.0.20.2/admin/observability/agent中的10.0.20.2是根据规划表中Cloudtower的ip填入的，其他都是固定值）
+  {"operationName":"updateObservabilityConnectedSystemServices","variables":{"ovm_name":"observability","connected_system_services":[{"system_service_id":"CLOUDTOWER","system_service_name":"CloudTower","type":"CLOUDTOWER","alerting_rules":[{"name":"cluster_connect_status","type":"METRIC","metric_validator":{"interval":"30s","for":"5m","query_tmpl":"cluster_connect_status * on (_tenant_id) group_left (service_name) obs_agent_info == 0"},"metric_descriptor":{"unit":"UNIT_UNSPECIFIED"},"default_thresholds":[{"severity":"INFO","value":"0"}],"thresholds":[{"severity":"INFO","value":"0"}],"messages":[{"locale":"en-US","str":"CloudTower failed to connect to the {{ $labels.clusterType }} cluster {{ $labels.clusterName }}."},{"locale":"zh-CN","str":"CloudTower 与 {{ $labels.clusterType }} 集群 {{ $labels.clusterName }} 连接异常。"}],"causes":[{"locale":"en-US","str":"Network connectivity error or cluster status error."},{"locale":"zh-CN","str":"网络连接异常或集群运行状态异常。"}],"impacts":[{"locale":"en-US","str":"This may prevent the cluster from functioning or being managed properly."},{"locale":"zh-CN","str":"可能导致无法正常使用或管理集群。"}],"solutions":[{"locale":"en-US","str":"Please check the network connectivity or the cluster status."},{"locale":"zh-CN","str":"请确认网络连通性或集群状态。"}]},{"name":"cluster_authentication_status","type":"METRIC","metric_validator":{"interval":"30s","for":"5m","query_tmpl":"cluster_authentication_status * on (_tenant_id) group_left (service_name) obs_agent_info == 0"},"metric_descriptor":{"unit":"UNIT_UNSPECIFIED"},"default_thresholds":[{"severity":"INFO","value":"0"}],"thresholds":[{"severity":"INFO","value":"0"}],"messages":[{"locale":"en-US","str":"Cluster unreachable due to authentication failure for the {{ $labels.clusterType }} cluster {{ $labels.clusterName }}."},{"locale":"zh-CN","str":"集群无法连接，因 {{ $labels.clusterType }} 集群 {{ $labels.clusterName }} 鉴权失败。"}],"causes":[{"locale":"en-US","str":"Cluster authentication failed."},{"locale":"zh-CN","str":"集群鉴权失败。"}],"impacts":[{"locale":"en-US","str":"CloudTower failed to connect to the cluster, which may result in the cluster being unavailable or unmanageable."},{"locale":"zh-CN","str":"CloudTower 与集群连接异常，可能无法正常使用或管理集群。"}],"solutions":[{"locale":"en-US","str":"Please confirm that the administrator username and password are correct."},{"locale":"zh-CN","str":"请确认集群管理员用户名及密码。"}]},{"name":"service_cpu_usage_overload","type":"METRIC","metric_validator":{"interval":"30s","for":"10m","query_tmpl":"sum without (mode) (avg without (cpu) (rate(node_cpu_seconds_total{mode!='idle'}[2m]))) * on (_tenant_id) group_left (service_name, vm_name) obs_agent_info * 100 > {{ .threshold }}"},"metric_descriptor":{"unit":"PERCENT"},"default_thresholds":[{"severity":"NOTICE","value":"90"}],"thresholds":[{"severity":"NOTICE","value":"90"}],"messages":[{"locale":"en-US","str":"The CPU usage of the virtual machine {{ $labels.vm_name }} running CloudTower is too high."},{"locale":"zh-CN","str":"运行 CloudTower 的虚拟机 {{ $labels.vm_name }} 的 CPU 占用过高。"}],"causes":[{"locale":"en-US","str":"The increased system load causes the vCPUs on the virtual machine running the system service to become insufficient for the service to run properly."},{"locale":"zh-CN","str":"因系统负载增大，当前运行系统服务的虚拟机的 vCPU 数量已不足以支持系统服务平稳运行。"}],"impacts":[{"locale":"en-US","str":"The system service may not run properly."},{"locale":"zh-CN","str":"可能导致系统服务无法正常提供服务。"}],"solutions":[{"locale":"en-US","str":"Scale up the system service virtual machine, or contact technical support for assistance."},{"locale":"zh-CN","str":"提高该系统服务虚拟机的资源配置，或联系售后技术支持。"}]},{"name":"service_disk_usage_overload","type":"METRIC","metric_validator":{"interval":"30s","for":"5m","query_tmpl":"100 - (node_filesystem_avail_bytes{mountpoint='/'} / node_filesystem_size_bytes{mountpoint='/'}) * on (_tenant_id) group_left (service_name, vm_name) obs_agent_info * 100 > {{ .threshold }}"},"metric_descriptor":{"unit":"PERCENT"},"default_thresholds":[{"severity":"NOTICE","value":"90"}],"thresholds":[{"severity":"NOTICE","value":"90"}],"messages":[{"locale":"en-US","str":"The storage capacity on the virtual machine {{ $labels.vm_name }} running CloudTower is insufficient."},{"locale":"zh-CN","str":"运行 CloudTower 的虚拟机 {{ $labels.vm_name }} 的存储空间不足。"}],"causes":[{"locale":"en-US","str":"The increased system load causes the storage capacity on the virtual machine running the system service to become insufficient for the service to run properly."},{"locale":"zh-CN","str":"因系统负载增大，当前运行系统服务的虚拟机的存储空间已不足以支持系统服务平稳运行。"}],"impacts":[{"locale":"en-US","str":"The system service may not run properly."},{"locale":"zh-CN","str":"可能导致系统服务无法正常提供服务。"}],"solutions":[{"locale":"en-US","str":"Scale up the system service virtual machine, or contact technical support for assistance."},{"locale":"zh-CN","str":"提高该系统服务虚拟机的资源配置，或联系售后技术支持。"}]},{"name":"service_memory_usage_overload","type":"METRIC","metric_validator":{"interval":"30s","for":"5m","query_tmpl":"100 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 * on (_tenant_id) group_left (service_name, vm_name) obs_agent_info > {{ .threshold }}"},"metric_descriptor":{"unit":"PERCENT"},"default_thresholds":[{"severity":"NOTICE","value":"80"}],"thresholds":[{"severity":"NOTICE","value":"80"}],"messages":[{"locale":"en-US","str":"The memory usage of the virtual machine {{ $labels.vm_name }} running CloudTower is too high."},{"locale":"zh-CN","str":"运行 CloudTower 的虚拟机 {{ $labels.vm_name }} 的内存使用率过高。"}],"causes":[{"locale":"en-US","str":"The increased system load causes the memory on the virtual machine running the system service to become insufficient for the service to run properly."},{"locale":"zh-CN","str":"因系统负载增大，当前运行系统服务的虚拟机的内存分配量已不足以支持系统服务平稳运行。"}],"impacts":[{"locale":"en-US","str":"The system service may not run properly."},{"locale":"zh-CN","str":"可能导致系统服务无法正常提供服务。"}],"solutions":[{"locale":"en-US","str":"Scale up the system service virtual machine, or contact technical support for assistance."},{"locale":"zh-CN","str":"提高该系统服务虚拟机的资源配置，或联系售后技术支持。"}]},{"name":"service_vm_has_no_ntp_server","type":"METRIC","metric_validator":{"interval":"30s","query_tmpl":"host_ntp_server_numbers * on (_tenant_id) group_left (service_name, vm_name) obs_agent_info == {{ .threshold }}"},"default_thresholds":[{"severity":"INFO","value":"0"}],"thresholds":[{"severity":"INFO","value":"0"}],"messages":[{"locale":"en-US","str":"CloudTower is not configured with an NTP server."},{"locale":"zh-CN","str":"CloudTower 未配置 NTP 服务器。"}],"causes":[{"locale":"en-US","str":"CloudTower is not configured with an NTP server."},{"locale":"zh-CN","str":"CloudTower 未配置 NTP 服务器。"}],"impacts":[{"locale":"en-US","str":"The CloudTower time might be inaccurate, which affects the time display in task and monitoring functions. Other system services including backup and SKS might encounter exceptions. "},{"locale":"zh-CN","str":"CloudTower 的时间可能不准确，影响任务、监控等功能的时间显示，或造成备份与容灾、Kubernetes 等其他系统服务的功能异常。"}],"solutions":[{"locale":"en-US","str":"Configure an NTP server for CloudTower."},{"locale":"zh-CN","str":"为 CloudTower 配置 NTP 服务器。"}]},{"name":"service_vm_disconnect_with_each_ntp_server","type":"METRIC","metric_validator":{"interval":"30s","query_tmpl":"host_can_connect_with_each_ntp_server * on (_tenant_id) group_left (service_name, vm_name) obs_agent_info == {{ .threshold }}"},"metric_descriptor":{"is_boolean":true},"default_thresholds":[{"severity":"NOTICE","value":"0"}],"thresholds":[{"severity":"NOTICE","value":"0"}],"messages":[{"locale":"en-US","str":"Failed to establish the connection between the CloudTower and the NTP server {{ $labels.ntp_server }}."},{"locale":"zh-CN","str":"CloudTower 无法与 NTP 服务器 {{ $labels.ntp_server }} 建立连接。"}],"causes":[{"locale":"en-US","str":"The current NTP server’s domain name or IP address might be invalid, or there might be a network exception."},{"locale":"zh-CN","str":"当前设置的 NTP 服务器域名、IP 地址可能无效，或存在网络异常。"}],"impacts":[{"locale":"en-US","str":"The CloudTower time might be inconsistent with the NTP server time."},{"locale":"zh-CN","str":"CloudTower 与 NTP 服务器的时间可能不同步。"}],"solutions":[{"locale":"en-US","str":"Check the network connection, or verify the validity of the external NTP server’s domain name and IP address. If the connection to the NTP server fails, you need to reconfigure a valid NTP server."},{"locale":"zh-CN","str":"检查网络连接或外部 NTP 服务器域名、IP 是否有效。若无法正常连接 NTP 服务器，则重新设置一个有效的 NTP 服务器。"}]},{"name":"service_vm_time_offset_with_ntp_leader","type":"METRIC","metric_validator":{"interval":"30s","for":"3m","query_tmpl":"host_time_offset_with_ntp_leader_seconds * on (_tenant_id) group_left (service_name, vm_name) obs_agent_info > {{ .threshold }}"},"metric_descriptor":{"unit":"SECOND"},"default_thresholds":[{"severity":"INFO","value":"10"},{"severity":"NOTICE","value":"30"},{"severity":"CRITICAL","value":"60"}],"thresholds":[{"severity":"INFO","value":"10"},{"severity":"NOTICE","value":"30"},{"severity":"CRITICAL","value":"60"}],"messages":[{"locale":"en-US","str":"The time offset between the CloudTower and the NTP server is excessively large."},{"locale":"zh-CN","str":"CloudTower 与 NTP 服务器时间偏移量过大。"}],"causes":[{"locale":"en-US","str":"The time offset between the CloudTower and the NTP server is excessively large."},{"locale":"zh-CN","str":"CloudTower 与 NTP 服务器时间偏差过大。"}],"impacts":[{"locale":"en-US","str":"The CloudTower time is inaccurate, and the NTP service might stop synchronizing time."},{"locale":"zh-CN","str":"CloudTower 的时间不准确，且可能导致 NTP 服务停止同步。"}],"solutions":[{"locale":"en-US","str":"Contact technical support for assistance."},{"locale":"zh-CN","str":"联系售后技术支持。"}]},{"name":"cloudtower_system_service_vm_time_offset_seconds","type":"METRIC","metric_validator":{"interval":"30s","for":"3m","query_tmpl":"abs(cloudtower_system_service_vm_time_offset_seconds) * on (_tenant_id) group_left (service_name) obs_agent_info > {{ .threshold }}"},"metric_descriptor":{"unit":"SECOND"},"default_thresholds":[{"severity":"NOTICE","value":"30"},{"severity":"CRITICAL","value":"60"}],"thresholds":[{"severity":"NOTICE","value":"30"},{"severity":"CRITICAL","value":"60"}],"messages":[{"locale":"en-US","str":"The time offset between CloudTower and the system service virtual machine {{ $labels.vm_name }} is excessively large."},{"locale":"zh-CN","str":"CloudTower 与系统服务虚拟机 {{ $labels.vm_name }} 的时间偏移量过大。"}],"causes":[{"locale":"en-US","str":"The CloudTower time is inconsistent with the time of the system service virtual machine {{ $labels.vm_name }}."},{"locale":"zh-CN","str":"CloudTower 与系统服务虚拟机 {{ $labels.vm_name }} 的时间不同步。"}],"impacts":[{"locale":"en-US","str":"The system service might not be able to function properly."},{"locale":"zh-CN","str":"系统服务可能无法正常工作。"}],"solutions":[{"locale":"en-US","str":"Configure time-consistent NTP servers for the system service and CloudTower, and check the synchronization between the system service and its NTP server."},{"locale":"zh-CN","str":"为系统服务与 CloudTower 配置时间一致的 NTP 服务器，并检查系统服务与 NTP 服务器的同步情况。"}]},{"name":"cloudtower_cluster_time_offset_seconds","type":"METRIC","metric_validator":{"interval":"30s","for":"3m","query_tmpl":"abs(cloudtower_cluster_time_offset_seconds) * on (_tenant_id) group_left (service_name) obs_agent_info > {{ .threshold }}"},"metric_descriptor":{"unit":"SECOND"},"default_thresholds":[{"severity":"INFO","value":"10"},{"severity":"NOTICE","value":"30"}],"thresholds":[{"severity":"INFO","value":"10"},{"severity":"NOTICE","value":"30"}],"messages":[{"locale":"en-US","str":"The time offset between CloudTower and the cluster {{ $labels.cluster_name }} is excessively large."},{"locale":"zh-CN","str":"CloudTower 与集群 {{ $labels.cluster_name }} 的时间偏移量过大。"}],"causes":[{"locale":"en-US","str":"The CloudTower time is inconsistent with the cluster time."},{"locale":"zh-CN","str":"CloudTower 与集群的时间不同步。"}],"impacts":[{"locale":"en-US","str":"The functions on CloudTower including task and monitoring involving the cluster might have time offset."},{"locale":"zh-CN","str":"CloudTower 上与该集群相关的任务、监控等功能可能出现时间偏移。"}],"solutions":[{"locale":"en-US","str":"Configure time-consistent NTP servers for the cluster and CloudTower."},{"locale":"zh-CN","str":"为集群与 CloudTower 配置时间一致的 NTP 服务器。"}]},{"name":"everoute_service_unavailable","type":"METRIC","default_thresholds":[{"severity":"CRITICAL","value":"0"}],"thresholds":[{"severity":"CRITICAL","value":"0"}],"metric_validator":{"interval":"1m0s","for":"0s","query_tmpl":"everoute_admission_everoute_phase{phase=\"Failed\"} == 1"},"metric_descriptor":{"unit":"UNIT_UNSPECIFIED","is_boolean":false},"messages":[{"locale":"en-US","str":"The Everoute service {{ $labels.everoute_displayname }} is in an abnormal state due to {{ $labels.error_code }}."},{"locale":"zh-CN","str":"Everoute 服务 {{ $labels.everoute_displayname }} 处于异常状态，原因为 {{ $labels.error_code }}。"}],"causes":[{"locale":"en-US","str":"The maintanance and management operation on the Everoute service failed."},{"locale":"zh-CN","str":"Everoute 服务运维管理操作失败。"}],"impacts":[{"locale":"en-US","str":"The Everoute service cannot work properly."},{"locale":"zh-CN","str":"Everoute 无法正常提供服务。"}],"solutions":[{"locale":"en-US","str":"Identify the reason for the failure and manually retry the previous operation, or follow Operation and Maintenance Guide to recover the Everoute service."},{"locale":"zh-CN","str":"确认操作失败原因，手动重试或按照运维管理手册恢复。"}]},{"name":"everoute_license_dfw_soon_to_expire","type":"METRIC","default_thresholds":[{"severity":"INFO","value":"30"},{"severity":"NOTICE","value":"14"},{"severity":"CRITICAL","value":"1"}],"thresholds":[{"severity":"INFO","value":"30"},{"severity":"NOTICE","value":"14"},{"severity":"CRITICAL","value":"1"}],"metric_validator":{"interval":"1m0s","for":"0s","query_tmpl":"0 < (everoute_admission_license_available_days{feature_type=\"DFW\"} and on(feature_type) (everoute_admission_everoute_feature_enabled > 0)) <= {{ .threshold }}"},"metric_descriptor":{"unit":"UNIT_UNSPECIFIED","is_boolean":false},"messages":[{"locale":"en-US","str":"The Everoute distributed firewall license is less than {{ $value }} {{ if eq $value 1.0 }}day{{ else }}days{{ end }} from expiration."},{"locale":"zh-CN","str":"Everoute 中的分布式防火墙许可，距离过期不足 {{ $value }} 天。"}],"causes":[{"locale":"en-US","str":"The license will expire soon."},{"locale":"zh-CN","str":"许可即将过期。"}],"impacts":[{"locale":"en-US","str":"Once the license expires, you cannot create new resources or edit the existing ones."},{"locale":"zh-CN","str":"许可过期后，无法创建新的资源或编辑已有资源。"}],"solutions":[{"locale":"en-US","str":"Contact after-sales support to extend the license period, or uninstall this function if you no longer need it."},{"locale":"zh-CN","str":"联系售后人员，延长许可有效期，如不再使用可卸载此功能。"}]},{"name":"everoute_license_lb_soon_to_expire","type":"METRIC","default_thresholds":[{"severity":"INFO","value":"30"},{"severity":"NOTICE","value":"14"},{"severity":"CRITICAL","value":"1"}],"thresholds":[{"severity":"INFO","value":"30"},{"severity":"NOTICE","value":"14"},{"severity":"CRITICAL","value":"1"}],"metric_validator":{"interval":"1m0s","for":"0s","query_tmpl":"0 < (everoute_admission_license_available_days{feature_type=\"LB\"} and on(feature_type) (everoute_admission_everoute_feature_enabled > 0)) <= {{ .threshold }}"},"metric_descriptor":{"unit":"UNIT_UNSPECIFIED","is_boolean":false},"messages":[{"locale":"en-US","str":"The Everoute load balancer license is less than {{ $value }} {{ if eq $value 1.0 }}day{{ else }}days{{ end }} from expiration."},{"locale":"zh-CN","str":"Everoute 中的负载均衡器许可，距离过期不足 {{ $value }} 天。"}],"causes":[{"locale":"en-US","str":"The license will expire soon."},{"locale":"zh-CN","str":"许可即将过期。"}],"impacts":[{"locale":"en-US","str":"Once the license expires, you cannot create new resources or edit the existing ones."},{"locale":"zh-CN","str":"许可过期后，无法创建新的资源或编辑已有资源。"}],"solutions":[{"locale":"en-US","str":"Contact after-sales support to extend the license period, or uninstall this function if you no longer need it."},{"locale":"zh-CN","str":"联系售后人员，延长许可有效期，如不再使用可卸载此功能。"}]},{"name":"everoute_license_vpc_soon_to_expire","type":"METRIC","default_thresholds":[{"severity":"INFO","value":"30"},{"severity":"NOTICE","value":"14"},{"severity":"CRITICAL","value":"1"}],"thresholds":[{"severity":"INFO","value":"30"},{"severity":"NOTICE","value":"14"},{"severity":"CRITICAL","value":"1"}],"metric_validator":{"interval":"1m0s","for":"0s","query_tmpl":"0 < (everoute_admission_license_available_days{feature_type=\"VPC\"} and on(feature_type) (everoute_admission_everoute_feature_enabled > 0)) <= {{ .threshold }}"},"metric_descriptor":{"unit":"UNIT_UNSPECIFIED","is_boolean":false},"messages":[{"locale":"en-US","str":"The Everoute VPC networking license is less than {{ $value }} {{ if eq $value 1.0 }}day{{ else }}days{{ end }} from expiration."},{"locale":"zh-CN","str":"Everoute 中的虚拟专有云网络许可，距离过期不足 {{ $value }} 天。"}],"causes":[{"locale":"en-US","str":"The license will expire soon."},{"locale":"zh-CN","str":"许可即将过期。"}],"impacts":[{"locale":"en-US","str":"Once the license expires, you cannot create new resources or edit the existing ones."},{"locale":"zh-CN","str":"许可过期后，无法创建新的资源或编辑已有资源。"}],"solutions":[{"locale":"en-US","str":"Contact after-sales support to extend the license period, or uninstall this function if you no longer need it."},{"locale":"zh-CN","str":"联系售后人员，延长许可有效期，如不再使用可卸载此功能。"}]},{"name":"everoute_license_dfw_expired","type":"METRIC","default_thresholds":[{"severity":"CRITICAL","value":"0"}],"thresholds":[{"severity":"CRITICAL","value":"0"}],"metric_validator":{"interval":"1m0s","for":"0s","query_tmpl":"(everoute_admission_license_available_days{feature_type=\"DFW\"} and on(feature_type) (everoute_admission_everoute_feature_enabled > 0)) <= 0"},"metric_descriptor":{"unit":"UNIT_UNSPECIFIED","is_boolean":false},"messages":[{"locale":"en-US","str":"The Everoute distributed firewall license has expired."},{"locale":"zh-CN","str":"Everoute 中的分布式防火墙许可已经过期。"}],"causes":[{"locale":"en-US","str":"The license has expired."},{"locale":"zh-CN","str":"许可已经过期。"}],"impacts":[{"locale":"en-US","str":"Once the license expires, you cannot create new resources or edit the existing ones."},{"locale":"zh-CN","str":"许可过期后，无法创建新的资源或编辑已有资源。"}],"solutions":[{"locale":"en-US","str":"Contact after-sales support to extend the license period, or uninstall this function if you no longer need it."},{"locale":"zh-CN","str":"联系售后人员，延长许可有效期，如不再使用可卸载此功能。"}]},{"name":"everoute_license_lb_expired","type":"METRIC","default_thresholds":[{"severity":"CRITICAL","value":"0"}],"thresholds":[{"severity":"CRITICAL","value":"0"}],"metric_validator":{"interval":"1m0s","for":"0s","query_tmpl":"(everoute_admission_license_available_days{feature_type=\"LB\"} and on(feature_type) (everoute_admission_everoute_feature_enabled > 0)) <= 0"},"metric_descriptor":{"unit":"UNIT_UNSPECIFIED","is_boolean":false},"messages":[{"locale":"en-US","str":"The Everoute load balancer license has expired."},{"locale":"zh-CN","str":"Everoute 中的负载均衡器许可已经过期。"}],"causes":[{"locale":"en-US","str":"The license has expired."},{"locale":"zh-CN","str":"许可已经过期。"}],"impacts":[{"locale":"en-US","str":"Once the license expires, you cannot create new resources or edit the existing ones."},{"locale":"zh-CN","str":"许可过期后，无法创建新的资源或编辑已有资源。"}],"solutions":[{"locale":"en-US","str":"Contact after-sales support to extend the license period, or uninstall this function if you no longer need it."},{"locale":"zh-CN","str":"联系售后人员，延长许可有效期，如不再使用可卸载此功能。"}]},{"name":"everoute_license_vpc_expired","type":"METRIC","default_thresholds":[{"severity":"CRITICAL","value":"0"}],"thresholds":[{"severity":"CRITICAL","value":"0"}],"metric_validator":{"interval":"1m0s","for":"0s","query_tmpl":"(everoute_admission_license_available_days{feature_type=\"VPC\"} and on(feature_type) (everoute_admission_everoute_feature_enabled > 0)) <= 0"},"metric_descriptor":{"unit":"UNIT_UNSPECIFIED","is_boolean":false},"messages":[{"locale":"en-US","str":"The Everoute VPC networking license has expired."},{"locale":"zh-CN","str":"Everoute 中的虚拟专有云网络许可已经过期。"}],"causes":[{"locale":"en-US","str":"The license has expired."},{"locale":"zh-CN","str":"许可已经过期。"}],"impacts":[{"locale":"en-US","str":"Once the license expires, you cannot create new resources or edit the existing ones."},{"locale":"zh-CN","str":"许可过期后，无法创建新的资源或编辑已有资源。"}],"solutions":[{"locale":"en-US","str":"Contact after-sales support to extend the license period, or uninstall this function if you no longer need it."},{"locale":"zh-CN","str":"联系售后人员，延长许可有效期，如不再使用可卸载此功能。"}]},{"name":"everoute_binding_no_tep_ip_hosts","type":"METRIC","default_thresholds":[{"severity":"INFO","value":"0"}],"thresholds":[{"severity":"INFO","value":"0"}],"metric_validator":{"interval":"1m","for":"0s","query_tmpl":"everoute_admission_binding_no_tep_ip_hosts == 1"},"metric_descriptor":{"unit":"UNIT_UNSPECIFIED"},"messages":[{"locale":"en-US","str":"In the cluster {{ $labels.cluster_name }} associated with Everoute VPC networking, the following hosts do not have TEP IP addresses{{\":\"}} {{ $labels.hosts_name | reReplaceAll \",\" \", \" }}."},{"locale":"zh-CN","str":"Everoute 虚拟专有云网络已关联的集群 {{ $labels.cluster_name }} 中，主机 {{ $labels.hosts_name | reReplaceAll \",\" \"、\" }} 未添加 TEP IP 地址。"}],"causes":[{"locale":"en-US","str":"After scaling out the cluster, the newly added hosts are not configured with TEP IP addresses."},{"locale":"zh-CN","str":"集群扩容后，没有为新增主机配置 TEP IP 地址。"}],"impacts":[{"locale":"en-US","str":"Adding or deleting a virtual NIC of the VPC type from a virtual machine in the cluster might fail."},{"locale":"zh-CN","str":"集群中的虚拟机增加或删除 VPC 类型的虚拟网卡时可能会失败。"}],"solutions":[{"locale":"en-US","str":"Bind the ports on the hosts to the virtual distributed switch {{ $labels.vds_name }}, and add TEP IP addresses to the hosts. "},{"locale":"zh-CN","str":"将主机的网口绑定至虚拟分布式交换机 {{ $labels.vds_name }}，并为主机添加 TEP IP。"}]},{"name":"fsc_is_unhealthy","type":"METRIC","default_thresholds":[{"severity":"CRITICAL","value":"0"}],"thresholds":[{"severity":"CRITICAL","value":"0"}],"metric_validator":{"for":"2m","interval":"15s","query_tmpl":"(sfs_operator_fsc_unhealthy == 1 and on(sfscluster) sfs_operator_cluster_services_unavailable{service=\"etcd\"} == 0 and on(sfscluster) sfs_operator_cluster_services_unavailable{service=\"k8s-api-server\"} == 0) > {{ .threshold }}"},"metric_descriptor":{"is_boolean":true},"messages":[{"locale":"en-US","str":"The file controller {{ $labels.fsc }} of the file storage cluster {{ $labels.sfscluster }} is abnormal."},{"locale":"zh-CN","str":"文件存储集群 {{ $labels.sfscluster }} 的文件控制器 {{ $labels.fsc }} 状态异常。"}],"causes":[{"locale":"en-US","str":"The file controller is not running, the internal service component of the file controller is abnormal, or the file storage network is abnormal."},{"locale":"zh-CN","str":"文件控制器状态为未运行、文件控制器内部服务组件异常，或文件存储网络异常。"}],"impacts":[{"locale":"en-US","str":"The control service and the storage service of the file storage cluster might be affected."},{"locale":"zh-CN","str":"文件存储集群的管控服务和存储服务可能受到影响。"}],"solutions":[{"locale":"en-US","str":"Check the file controller's status and the network connectivity, or contact our technical support for assistance."},{"locale":"zh-CN","str":"检查文件控制器的运行状态、网络连接状态，或联系售后技术支持。"}]},{"name":"cluster_api_components_are_unavailable","type":"METRIC","default_thresholds":[{"severity":"CRITICAL","value":"0"}],"thresholds":[{"severity":"CRITICAL","value":"0"}],"metric_validator":{"for":"30s","interval":"15s","query_tmpl":"(sfs_operator_cluster_services_unavailable{service=~\"k8s-api-server|etcd\"} == 1) > {{ .threshold }}"},"metric_descriptor":{"is_boolean":true},"messages":[{"locale":"en-US","str":"The API component {{ $labels.service }} in the file storage cluster {{ $labels.sfscluster }} is abnormal."},{"locale":"zh-CN","str":"文件存储集群 {{ $labels.sfscluster }} 中的 API 组件 {{ $labels.service }} 状态异常。"}],"causes":[{"locale":"en-US","str":"The API component {{ $labels.service }} in the file storage cluster is not running, the file management network is abnormal, the file storage network is abnormal, or the file controller is not running."},{"locale":"zh-CN","str":"文件存储集群中的 API 组件 {{ $labels.service }} 未运行，文件管理网络异常，文件存储网络异常，或文件控制器状态为未运行。"}],"impacts":[{"locale":"en-US","str":"The control service or the storage service of the file storage cluster is affected."},{"locale":"zh-CN","str":"文件存储集群的管控服务和（或）存储服务受到影响。"}],"solutions":[{"locale":"en-US","str":"Check the file controller's status and the network connectivity, or contact our technical support for assistance."},{"locale":"zh-CN","str":"检查文件控制器的运行状态、网络连接状态，或联系售后技术支持。"}]},{"name":"cluster_sfs_components_are_unavailable","type":"METRIC","default_thresholds":[{"severity":"CRITICAL","value":"0"}],"thresholds":[{"severity":"CRITICAL","value":"0"}],"metric_validator":{"for":"30s","interval":"15s","query_tmpl":"(sfs_operator_cluster_services_unavailable{service=~\"sfs-manager|sfs-cloud-provider\"} == 1 and ignoring(service) sfs_operator_cluster_services_unavailable{service=\"etcd\"} == 0 and ignoring(service) sfs_operator_cluster_services_unavailable{service=\"k8s-api-server\"} == 0) > {{ .threshold }}"},"metric_descriptor":{"is_boolean":true},"messages":[{"locale":"en-US","str":"The file service component {{ $labels.service }} in the file storage cluster {{ $labels.sfscluster }} is abnormal."},{"locale":"zh-CN","str":"文件存储集群 {{ $labels.sfscluster }} 中的文件服务组件 {{ $labels.service }} 状态异常。"}],"causes":[{"locale":"en-US","str":"The file service component {{ $labels.service }} in the file storage cluster is not running, or the file management network is abnormal."},{"locale":"zh-CN","str":"文件存储集群中的文件服务组件 {{ $labels.service }} 未运行，或文件管理网络异常。"}],"impacts":[{"locale":"en-US","str":"The control service of the file storage cluster is affected."},{"locale":"zh-CN","str":"文件存储集群的管控服务受到影响。"}],"solutions":[{"locale":"en-US","str":"Check the network connectivity, or contact our technical support for assistance."},{"locale":"zh-CN","str":"检查网络连接状态，或联系售后技术支持。"}]},{"name":"fsc_os_volume_pinning_not_enabled","type":"METRIC","default_thresholds":[{"severity":"CRITICAL","value":"0"}],"thresholds":[{"severity":"CRITICAL","value":"0"}],"metric_validator":{"interval":"15s","for":"30s","query_tmpl":"sfs_operator_fsc_os_volume_pinning_not_enabled > {{ .threshold }}"},"metric_descriptor":{"is_boolean":true},"messages":[{"locale":"en-US","str":"The system disk {{ $labels.volume_uuid }} of the file controller {{ $labels.fsc }} in the file storage cluster {{ $labels.sfscluster }} does not have volume pinning enabled."},{"locale":"zh-CN","str":"文件存储集群 {{ $labels.sfscluster }} 的文件控制器 {{ $labels.fsc }} 的系统盘 {{ $labels.volume_uuid }} 未启用常驻缓存。"}],"causes":[{"locale":"en-US","str":"The system disk of the file controller does not have volume pinning enabled."},{"locale":"zh-CN","str":"文件控制器的系统盘未启用常驻缓存。"}],"impacts":[{"locale":"en-US","str":"The control service on the file storage cluster might be affected during cache breakdown."},{"locale":"zh-CN","str":"文件存储集群的管控服务可能会在缓存击穿时受到影响。"}],"solutions":[{"locale":"en-US","str":"Enable volume pinning for the system disk of the corresponding file controller."},{"locale":"zh-CN","str":"为相应的文件控制器系统盘启用常驻缓存。"}]}],"instances":[{"url":"http://10.0.20.2/admin/observability/agent","info":{"service_name":"CloudTower","vm_name":"cloudtower"}}]}]},"query":"mutation updateObservabilityConnectedSystemServices($ovm_name: String!, $connected_system_services: [UpdateObservabilityConnectedSystemServiceInput!]!) {\n  updateObservabilityConnectedSystemServices(ovm_name: $ovm_name, connected_system_services: $connected_system_services) {\n    connected_system_services {\n      id\n      type\n      status\n      system_service {\n        id\n        name\n        version\n        __typename\n      }\n      instances {\n        state\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n"}
+
+  响应
+  {
+    "data": {
+        "updateObservabilityConnectedSystemServices": {
+            "connected_system_services": [
+                {
+                    "id": "37KWbxlRh2aGU8mb7N8bLwqZ6jb",
+                    "type": "CLOUDTOWER",
+                    "status": "INSTALLING",
+                    "system_service": {
+                        "id": "CLOUDTOWER",
+                        "name": "CloudTower",
+                        "version": "4.7.1",
+                        "__typename": "ObservabilityConnectedSystemServiceInfo"
+                    },
+                    "instances": [
+                        {
+                            "state": "STATE_UNSPECIFIED",
+                            "__typename": "ObservabilityConnectedSystemServiceInstance"
+                        }
+                    ],
+                    "__typename": "ObservabilityConnectedSystemService"
+                }
+            ],
+            "__typename": "ObservabilityConnectedSystemServices"
+        }
+    }
+}
+
+
 
   ## 部署备份
   
@@ -2415,6 +2952,268 @@ x-smartx-token：d513e36581044eb691ba9589eebac995
     "ec": "EOK",
     "error": {}
 }
+
+
+  ## 查询集群ID
+  请求网址
+  https://your_tower_url/v2/api/get-clusters
+  请求方法
+  POST
+
+  header
+  Authorization: token（通过cloudtower登录接口获取的token）
+
+  载荷（where部分的name字段填写集群名称，用于查询集群ID，来源与规划表）
+  {
+  "where": {
+  "name": "CN-BJ-SMTX-Prod-Cls01"
+  }
+  }
+
+
+  返回示例（"id": "cmjcow5a1038u09588mxmnop7" id字段即为集群ID，写入变量cluster_id）
+  [
+    {
+        "access_write_compress_enabled": false,
+        "allocated_prioritized_space": 0,
+        "allocated_prioritized_space_usage": 0,
+        "application_highest_version": "6.2.0",
+        "applications": [],
+        "architecture": "X86_64",
+        "auto_converge": true,
+        "commited_memory_bytes": 252527766528,
+        "connect_state": "CONNECTED",
+        "consistency_groups": [],
+        "current_cpu_model": "EPYC",
+        "data_reduction_ratio": 1,
+        "data_reduction_saving": 0,
+        "datacenters": [
+            {
+                "id": "cmjcow42b038609580wmbz3c6",
+                "name": "C89-LAB"
+            }
+        ],
+        "disconnected_date": null,
+        "disconnected_reason": null,
+        "dns": [
+            "10.0.0.114",
+            "10.0.0.1"
+        ],
+        "downgraded_prioritized_space": 0,
+        "ecp_license": {
+            "id": "cmjcowfye03gt0958q91rjoku"
+        },
+        "enable_tiering": true,
+        "entityAsyncStatus": null,
+        "everoute_cluster": null,
+        "failure_data_space": 0,
+        "has_metrox": true,
+        "host_num": 4,
+        "hosts": [
+            {
+                "id": "cmjcow6qr01r308582ljakeac",
+                "management_ip": "10.0.20.12",
+                "name": "BJ-SMTX-Prod-Node-02"
+            },
+            {
+                "id": "cmjcow6qs01r40858555m1xyu",
+                "management_ip": "10.0.20.13",
+                "name": "BJ-SMTX-Prod-Node-03"
+            },
+            {
+                "id": "cmjcow6qt01r508588kw4mvnt",
+                "management_ip": "10.0.20.14",
+                "name": "BJ-SMTX-Prod-Node-04"
+            },
+            {
+                "id": "cmjcow6qt01r60858yx019goc",
+                "management_ip": "10.0.20.11",
+                "name": "BJ-SMTX-Prod-Node-01"
+            }
+        ],
+        "hypervisor": "ELF",
+        "id": "cmjcow5a1038u09588mxmnop7",
+        "ip": "10.0.20.10",
+        "is_all_flash": false,
+        "iscsi_vip": null,
+        "labels": [],
+        "license_expire_date": "2026-01-18T08:42:44.000Z",
+        "license_serial": "adb7c8ab-e868-4a75-b171-4a07bfa77c46",
+        "license_sign_date": "2025-12-19T08:42:44.000Z",
+        "license_type": "TRIAL",
+        "local_id": "adb7c8ab-e868-4a75-b171-4a07bfa77c46",
+        "logical_used_data_space": 128362217472,
+        "maintenance_end_date": "1970-01-01T00:00:00.000Z",
+        "maintenance_start_date": "1970-01-01T00:00:00.000Z",
+        "management_vip": "10.0.20.10",
+        "max_chunk_num": 255,
+        "max_physical_data_capacity": 0,
+        "max_physical_data_capacity_per_node": 140737488355328,
+        "metro_availability_checklist": null,
+        "mgt_gateway": "10.0.20.1",
+        "mgt_netmask": "255.255.255.0",
+        "migration_data_size": null,
+        "migration_speed": null,
+        "name": "CN-BJ-SMTX-Prod-Cls01",
+        "no_performance_layer": false,
+        "ntp_mode": "EXTERNAL",
+        "ntp_servers": [
+            "10.0.0.2",
+            "ntp.c89.fun",
+            "10.0.0.1"
+        ],
+        "nvme_over_rdma_enabled": false,
+        "nvme_over_tcp_enabled": false,
+        "nvmf_enabled": false,
+        "overall_efficiency": 325.806695730855,
+        "perf_allocated_data_space": 259922853888,
+        "perf_failure_data_space": 0,
+        "perf_total_data_capacity": 4329314451456,
+        "perf_used_data_space": 259922853888,
+        "perf_valid_data_space": 4329314451456,
+        "planned_prioritized_space": 0,
+        "pmem_enabled": false,
+        "prio_space_percentage": 0,
+        "provisioned_cpu_cores": 24,
+        "provisioned_cpu_cores_for_active_vm": 24,
+        "provisioned_for_active_vm_ratio": 0.421052631578947,
+        "provisioned_memory_bytes": 54760833024,
+        "provisioned_ratio": 0.421052631578947,
+        "rdma_enabled": false,
+        "recommended_cpu_models": [
+            "EPYC"
+        ],
+        "recover_data_size": 0,
+        "recover_speed": 0,
+        "replica_capacity_only": false,
+        "reserved_cpu_cores_for_system_service": 47,
+        "running_vm_num": 2,
+        "settings": {
+            "id": "cmjcowfwz03gg09585pfhzim5"
+        },
+        "software_edition": "ENTERPRISE",
+        "stopped_vm_num": 0,
+        "stretch": false,
+        "suspended_vm_num": 0,
+        "total_cache_capacity": 5411642015744,
+        "total_cpu_cores": 104,
+        "total_cpu_hz": 257816000000,
+        "total_cpu_models": [
+            "host_passthrough",
+            "Dhyana",
+            "EPYC",
+            "EPYC-IBPB",
+            "Opteron_G3",
+            "Opteron_G2",
+            "Opteron_G1"
+        ],
+        "total_cpu_sockets": 5,
+        "total_data_capacity": 9313481392128,
+        "total_memory_bytes": 606261264384,
+        "total_prio_volume_size": 0,
+        "total_prio_volume_size_usage": 0,
+        "type": "SMTX_OS",
+        "upgrade_for_tiering": true,
+        "upgrade_tool_version": "6.2.0-rc61",
+        "used_cache_space": 262063783936,
+        "used_cpu_hz": 35757095999.998,
+        "used_data_space": 6373769216,
+        "used_memory_bytes": 85899682460.363,
+        "valid_cache_space": 5411642015744,
+        "valid_data_space": 9313481392128,
+        "vcenterAccount": null,
+        "vdses": [
+            {
+                "id": "cmjcow91302ah0858psz7ukz0",
+                "name": "vDS-MgMt-Network"
+            },
+            {
+                "id": "cmjcow91302ai0858lvd17pe7",
+                "name": "vDS-Storage-Network"
+            },
+            {
+                "id": "cmjcow91402aj0858ddjg7riv",
+                "name": "vDS-Prod-Network"
+            },
+            {
+                "id": "cmjcow91402ak0858sakdmxoc",
+                "name": "vds-ovsbr-internal"
+            }
+        ],
+        "version": "6.2.0",
+        "vhost_enabled": true,
+        "vm_folders": [],
+        "vm_num": 2,
+        "vm_templates": [
+            {
+                "id": "cmjl05eda0b6p0958p51qm3l2",
+                "name": "scos-kv5j86js6xp4nx5z4rhx"
+            }
+        ],
+        "vms": [
+            {
+                "id": "cmjcowaqq006dqrqawpcs010o",
+                "name": "cloudtower"
+            },
+            {
+                "id": "cmjl060u70bdd0958vq8wg5q2",
+                "name": "observability-obs-0"
+            }
+        ],
+        "witness": null,
+        "zones": []
+    }
+  ]
+
+
+
+
+  ## 查询虚拟网络vnet_id
+  
+  请求网址
+  https://your_tower_url/v2/api/get-vlans
+
+  请求方法
+  POST
+
+  header
+  Authorization: token（通过cloudtower登录接口获取的token）
+
+  响应（id字段即为vnet_id，写入变量vnet_id）
+      {
+        "entityAsyncStatus": null,
+        "gateway_ip": "",
+        "gateway_subnetmask": "",
+        "id": "cmjcow96r000lqrqalh84y2nd",
+        "labels": [],
+        "local_id": "adb7c8ab-e868-4a75-b171-4a07bfa77c46_c8a1e42d-e0f3-4d50-a190-53209a98f157",
+        "mode_type": "VLAN_ACCESS",
+        "name": "default",
+        "network_ids": [
+            "0"
+        ],
+        "qos_burst": null,
+        "qos_max_bandwidth": null,
+        "qos_min_bandwidth": null,
+        "qos_priority": null,
+        "subnetmask": "",
+        "type": "VM",
+        "vds": {
+            "id": "cmjcow91302ah0858psz7ukz0",
+            "name": "vDS-MgMt-Network"
+        },
+        "vlan_id": 0,
+        "vm_nics": [
+            {
+                "id": "cmjcowar4006gqrqae6dv9b0z"
+            },
+            {
+                "id": "cmjl0660e0011bwonzf7qch3o"
+            }
+        ]
+    }
+
+
 
 
   ## 查询管理网络VDS及业务网络VDS

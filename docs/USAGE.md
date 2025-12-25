@@ -106,7 +106,7 @@ type .\logs\cxvoyager.log | more
 6. 主机扫描的 HTTP 超时与重试次数统一由 `cxvoyager/common/config/default.yml` 的 `host_scan` 段落维护，`init_cluster` 与 `host_discovery_scanner` 会直接读取该配置。
 
 ### 应用上传阶段 (deploy_obs / deploy_bak / deploy_er / deploy_sfs / deploy_sks)
-1. 按阶段名称自动搜索对应包（如 deploy_obs 查找 `Observability-X86_64-*.tar.gz`，deploy_bak 查找 `Backup-X86_64-*.tar.gz`）。
+1. 按阶段名称自动搜索对应包（如 deploy_obs 查找 `Observability-*-v*.tar.gz`，支持 X86_64/AARCH64；deploy_bak 查找 `Backup-X86_64-*.tar.gz`）。
 2. --dry-run 下仅记录即将调用的 base_url、endpoint 与包名，不实际发起请求（无 mock）。
 3. 非 dry-run 时向 `POST /api/ovm-operator/api/v3/chunkedUploads` 提交 `{origin_file_name: <包名>}`，需要 Bearer 令牌。
 4. CloudTower 上传基址分辨顺序：`api.cloudtower_base_url` > `api.base_url` > deploy_cloudtower 阶段输出 > PlanModel.mgmt 中的 CloudTower IP > parsed_plan mgmt，默认 https。

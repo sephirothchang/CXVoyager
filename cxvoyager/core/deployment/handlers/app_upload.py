@@ -54,8 +54,19 @@ def _version_key(path: Path, regex: re.Pattern[str]) -> Tuple:
         return (0, 0, 0, 0, 0, path.name)
 
     version_parts = tuple(_parse_version_parts(match.group("version")))
-    date_part = int(match.group("date"))
-    build_part = int(match.group("build"))
+    group_dict = match.groupdict()
+    date_raw = group_dict.get("date")
+    build_raw = group_dict.get("build")
+
+    try:
+        date_part = int(date_raw) if date_raw is not None else 0
+    except ValueError:
+        date_part = 0
+
+    try:
+        build_part = int(build_raw) if build_raw is not None else 0
+    except ValueError:
+        build_part = 0
 
     if len(version_parts) < 3:
         padded_version: Tuple[int, ...] = tuple(list(version_parts) + [0] * (3 - len(version_parts)))
