@@ -1,213 +1,99 @@
-# 工具说明
+# CXVoyager
 
 > **许可证**：本项目依据 [GNU GPLv3](LICENSE) 授权发布，使用或分发时请遵守许可条款。
 
-使用现有的集群规划表作为信息来源，自动完成SMTX集群的部署和配置工作，极大地简化了部署流程，减少人为错误，提高部署效率。该工具涵盖从集群初始化、配置、Cloudtower部署与关联、集群配置、巡检、测试虚拟机创建到性能与可靠性测试等多个阶段，确保集群能够快速稳定地上线运行。
+CXVoyager 是一个自动化工具，用于基于集群规划表完成 SmartX SMTX 集群的端到端部署和配置。它涵盖从规划表解析、集群初始化、CloudTower 部署与关联、业务应用部署到测试与清理的完整流程，旨在简化部署、减少错误并提高效率。
 
-# 快速开始
-- Windows：双击或在 PowerShell 运行 `start-windows.ps1`
-- macOS：双击或在终端运行 `start-macos.command`
-- Linux：`chmod +x start-linux.sh && ./start-linux.sh`
-- SMTXOS（便携 Python，英文界面）：`chmod +x start-smtxos.sh && ./start-smtxos.sh`（详见 [USAGE_SMTXOS.md](USAGE_SMTXOS.md)）
+## 快速开始
 
-# 运行要求
-- Python 3.9+（SMTXOS 启动器会自动解压便携版 Python 3.10 并使用）
-- 规划表置于项目根目录，文件名包含固定关键字“SmartX超融合”“规划设计表”“ELF环境”
-- 无外网场景可提前准备离线包到 `cxvoyager/common/resources/offline_packages/`，或运行 `scripts/prepare_offline_installation_packages.py` 在有网环境下载
+- **Windows**：PowerShell 运行 `start-windows.ps1`
+- **macOS**：终端运行 `start-macos.command`
+- **Linux**：`chmod +x start-linux.sh && ./start-linux.sh`
+- **SMTXOS** `chmod +x start-smtxos.sh && ./start-smtxos.sh`（详见 [USAGE_SMTXOS.md](USAGE_SMTXOS.md)）
 
-# CLI 常用命令
-- `python -m cxvoyager` 或直接运行启动脚本进入交互主菜单
-- `parse`：解析规划表
-- `check --no-scan`：解析并校验（可跳过主机扫描）
-- `run --stages prepare,deploy_obs --dry-run`：按阶段执行，支持 dry-run/strict/debug 开关
-- `deploy`：交互选择阶段并执行
-- `stages-list`：列出阶段信息
-- 语言切换：设置环境变量 `CXVOYAGER_LANG=en_US` 可显示英文（start-smtxos.sh 已默认设置）
+### 运行要求
 
-# 自动部署工作流
+- Python 3.10
+- 规划表置于项目根目录，文件名包含“SmartX超融合”“规划设计表”“ELF环境”
+- 无外网场景可提前准备离线包，或运行 `scripts/prepare_offline_packages.py` 下载
 
-## 第零阶段 准备工作
-1. 解析集群规划表，确保其中包含所有必要的部署和配置信息，如果信息不完整或错误，提示用户修改规划表。
-2. 确保所有目标主机已经连接到网络，并自动验证网络连通性、端口可达性。
-3. 检查本地依赖环境，确保Python及所需库已安装。
+## 架构概述
 
-## 第一阶段 集群初始化（init_cluster）
-1. 读取现有的Excel表格，解析其中的部署相关信息。
-2. 根据表格中的主机IP地址，对每台主机进行扫描，获取必要的信息。
-   解析网卡信息，选择具有IPv6地址的网卡用于填充部署载荷中的"host_ip"字段。
-   解析硬盘信息，确保每台主机的硬盘符合部署要求，用途符合预期。
-3. 拼接每台主机的部署载荷，使用表格中的信息覆盖默认值。
-4. 记录部署载荷到日志文件，便于审计和排查问题。
-5. 提示用户确认部署信息，确认网络信息和硬盘信息，确保无误后继续。
-6. 使用部署接口发送拼接好的部署载荷。
-7. 连接到主机SSH，通过/var/log/zbs-deploy.INFO查看部署日志。
-8. 部署完成后，使用部署接口查询部署状态。
-9.  如果部署失败，显示zbs-deploy.INFO日志内容，提示用户修改excel表格配置内容，帮助排查问题。
-10. 提供一个重试选项，通过清除特定标记，使主机可重新部署
-11. 当zbs-deploy.INFO日志中出现"v2 playbook on stats"时，表示部署结束。
-12. 部署结束后需要通过接口判断部署是否成功
+CXVoyager 采用模块化架构，按领域分层组织代码：
 
-当前实现状态：
-* 已实现解析、建模、验证（含CIDR合法性/重叠、VIP冲突、IPv6 VIP与主机不匹配警告、绑定模式映射）。
-* 已实现并发主机扫描（mock回填 ifaces/disks）、IPv6优先选择、磁盘分类、部署载荷构建。
-* 已提供 dry-run 部署提交阶段：使用 `python -m cxvoyager.interfaces.cli run --stages prepare,init_cluster,deploy_obs --dry-run` 预览载荷（其他应用可按需选择 deploy_bak/deploy_er/deploy_sfs/deploy_sks）。
-* 非 dry-run 时会模拟提交并轮询状态（mock 模式下生成示例回显）。
+- **core/**：业务核心逻辑，包括部署、集群管理和验证
+- **integrations/**：外部系统适配器（SmartX API、Excel 解析、CloudTower）
+- **models/**：数据模型定义
+- **common/**：通用基础设施（配置、日志、工具函数）
+- **interfaces/**：接口层（CLI、Web API）
 
-## 第二阶段 集群配置（config_cluster）
-1. 读取现有的Excel表格，解析其中的配置相关信息。
-2. 配置fisheye管理员密码
-3. 配置集群VIP
-4. 配置IPMI地址及用户名密码（如有）
-5. 配置集群DNS及NTP服务器地址
-6. （可选）上传VMtools工具、cloudinit ISO 镜像
-7. 配置机架信息
+详细架构请参考 [ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
-> 设计细节可参考《[config_cluster 阶段设计](docs/CONFIG_CLUSTER_DESIGN.md)》，内含 SVT 上传（可按需执行）、业务网络创建、序列号回填等完整流程说明。
+## 部署阶段
 
-## 第三阶段 部署 CloudTower（deploy_cloudtower）
-1. 读取现有的Excel表格，解析其中的Cloudtower部署相关信息。
-2. 上传Cloudtower 安装介质（iso或tar包）
-3. 部署Cloudtower
-4. 配置Cloudtower
+CXVoyager 将部署流程分为 15 个阶段，每个阶段有明确的输入输出和目的。以下是阶段索引（详细文档见 `docs/Step_XX-*.md`）：
 
-> 设计细节与接口对接可参考《[CloudTower 部署设计](docs/CLOUDTOWER_DEPLOYMENT_DESIGN.md)》，其中涵盖 ISO 上传、虚拟机创建、自动化脚本与失败回滚方案。
+- **STEP 01 - PREPARE_PLAN_SHEET**：解析规划表并做验证与网络预检
+- **STEP 02 - INIT_CLUSTER**：主机扫描、构建部署载荷并触发集群部署
+- **STEP 03 - CONFIG_CLUSTER**：Fisheye 登录并配置集群 VIP/DNS/NTP 等
+- **STEP 04 - DEPLOY_CLOUDTOWER**：上传 ISO、创建 CloudTower VM 并安装
+- **STEP 05 - ATTACH_CLUSTER**：将集群接入 CloudTower
+- **STEP 06 - CLOUDTOWER_CONFIG**：CloudTower 高阶配置（NTP/DNS/策略/镜像）
+- **STEP 07 - CHECK_CLUSTER_HEALTHY**：调用巡检接口生成健康报告
+- **STEP 08 - DEPLOY_OBS**：上传 Observability 包
+- **STEP 09 - DEPLOY_BAK**：上传 Backup 包
+- **STEP 10 - DEPLOY_ER**：上传 ER 包
+- **STEP 11 - DEPLOY_SFS**：上传 SFS 包（需同步存储策略）
+- **STEP 12 - DEPLOY_SKS**：上传 SKS 包
+- **STEP 13 - CREATE_TEST_VMS**：创建测试虚机并验证连通性
+- **STEP 14 - PERF_RELIABILITY**：执行性能基准与故障注入测试
+- **STEP 15 - CLEANUP**：清理临时资源、归档日志
 
-## 第四阶段 接入 CloudTower（attach_cluster）
-1. 读取现有的Excel表格，解析其中的集群信息
-2. 使用第二阶段配置的集群VIP地址和fisheye管理员密码关联Cloudtower
+## CLI 使用
 
-## 第五阶段 CloudTower 配置（cloudtower_config）
-1. 读取现有的Excel表格，解析其中的Cloudtower集群配置相关信息
-2. 配置Cloudtower的ntp和dns
-3. 配置集群默认存储策略为2副本
-4. 创建业务网络虚拟交换机，创建业务虚拟机网络
-5. 配置监控面板
-6. 配置告警
+- 进入交互主菜单：`python -m cxvoyager` 或 `python main.py`
+- 解析规划表：`python -m cxvoyager parse`
+- 校验（跳过扫描）：`python -m cxvoyager check --no-scan`
+- 按阶段执行：`python -m cxvoyager run --stages prepare,init_cluster --dry-run`
+- 交互部署：`python -m cxvoyager deploy`
+- 列出阶段：`python -m cxvoyager stages-list`
+- 英文界面：设置 `CXVOYAGER_LANG=en_US`
 
-## 第六阶段 集群巡检（check_cluster_healthy）
-1. 使用Cloudtower巡检中心接口，对集群进行巡检
-2. 导出并下载巡检报告及cluster-info.json
-3. 收集集群序列号写入excel表格
-4. 收集Cloudtower序列号写入excel表格
-5. 收集主机序列号写入excel表格
+### 调试选项
 
-## 第七阶段 部署业务应用
-1. 读取规划表中的业务应用部署信息
-2. 部署并登记 OBS / BAK / ER / SFS / SKS 等组件
-3. 应用业务配置参数
+- `--debug`：启用 DEBUG 日志
+- `--strict-validation`：严格校验模式
+- `--dry-run`：预览模式，不实际执行
 
-## 第八阶段 创建测试虚机（create_test_vms）
-1. 读取现有的Excel表格，解析其中的测试虚拟机相关信息
-2. 导入ovf模板，SMTX-FIO虚拟机及SMTX-PAT虚拟机
-3. 克隆测试虚拟机，全闪或nvme缓存盘则每台主机2个fio测试虚拟机，混合每台主机1个
-4. 配置测试虚拟机网络
-5. 启动测试虚拟机
+## 规划表说明
 
-## 第九阶段 性能与可靠性（perf_reliability）
-1. 使用SMTX-FIO测试虚拟机进行性能测试
-2. 提示用户进行可靠性测试
+规划表是部署信息来源，需包含“SmartX超融合”“规划设计表”“ELF环境”关键词。关键 Sheet：
 
-## 第十阶段 收尾清理（cleanup）
-1. 关闭测试虚拟机
-2. 提示用户批量修改主机root密码和smartx用户密码
-3. 提示用户修改Cloudtower管理员密码
-4. 清理临时文件和日志
-5. 将部署日志、excel表格、cluster-info.json等重要文件打包备份
+- **虚拟网络**：管理/存储/业务网络配置
+- **主机规划**：集群主机信息
+- **集群管理信息**：CloudTower 等管理平台信息
 
-# 集群规划表说明
-1. 集群规划表位于工具同一目录下，名称类似为“05.【模板】SmartX超融合核心平台规划设计表-ELF环境-v20250820.xlsx”，其中模板可能为客户名称，version可能会变化，但是中间的关键词“SmartX超融合”、“规划设计表”和“ELF环境”是固定的，使用模糊匹配的方式定位这个文件作为部署信息来源
-2. 集群规划表中的sheet名称和表头名称存在中文，需要妥善处理编码问题，避免乱码和解析错误
-3. 集群规划表中的信息可能不完整，某些字段为空，需要在代码中处理这些情况，确保部署过程不会因为缺少信息而失败，如果变量具有默认值，则使用默认值，如果不具备默认值（例如Cloudtower管理员密码），则提示用户修改规划表配置
-4. 集群规划表可能存在格式问题，例如单元格合并、隐藏行列等，需要在代码中处理这些情况，确保能够正确解析表格内容
-5. 集群规划表可能存在空格、换行等人为错误，需要在代码中进行清洗和预处理，确保数据的准确性和一致性
-6. 集群规划表具有多个Sheet，其中sheet名称为“虚拟网络”、“主机规划”、“集群管理信息”的三个sheet是部署信息来源
-7. 虚拟网络描述了管理、存储、业务网络虚拟交换机和虚拟机网络的信息，集群名称是该集群的名称，虚拟交换机列是虚拟交换机名称，虚拟机网络列是虚拟机网络名称，如果虚拟网络对应行的subnetwork值为空，则表示不创建该虚拟交换机或虚拟机网络，主机端口表示该虚拟交换机所使用的网卡名称，网口绑定模式表示该虚拟交换机的网口绑定模式，支持“active-backup”、“balance-tcp”、“balance-slb”，如果为空则使用默认值“active-backup”；在开启RDMA的情况下，balance-tcp模式对应的部署载荷中的字段需要设置为"LACP"。
-8. 主机规划描述了集群的主机信息，例如集群名称、集群VIP；主机带外地址、带外用户名及密码；SMTX OS主机名，管理地址和存储地址，用于拼接部署载荷
-9. 集群管理信息描述了集群的管理平台信息，例如Cloudtower的ip，web管理员root用户的密码；其他应用组件的ip地址
-10. 集群规划表中的信息会被用来拼接各个阶段的API请求载荷，确保部署和配置过程能够顺利进行
+字段坐标和解析逻辑见 [规划表字段坐标.md](接口示例文件/规划表字段坐标.md)。
 
-> 解析逻辑基于固定坐标读取，所有单元格变量在 `cxvoyager/integrations/excel/field_variables.py` 中集中维护，可结合 `示例文件/规划表字段坐标.md` 快速对照与修改。
+### 验证细节
 
-### 新增的验证细节
-1. CIDR 合法性检查与重叠检测（重叠 -> 警告，非法 -> 错误）
-2. VIP 与管理地址冲突检查（错误）
-3. IPv6 VIP 但主机全为 IPv4 管理地址的情况会给出警告
-4. 绑定模式统一映射：active-backup -> ACTIVE_BACKUP, balance-tcp -> LACP, balance-slb -> SLB
-5. 规划缺失子网仅记为警告（不创建对应网络）
-6. 管理组件（CloudTower / OBS / 备份 / ER 控制器）IP 必须落在默认或额外管理网络的 CIDR 范围内；若配置额外管理网络则强制校验该子网。
+- CIDR 合法性检查与重叠检测
+- VIP 与管理地址冲突检查
+- IPv6/IPv4 兼容性警告
+- 绑定模式映射（active-backup -> ACTIVE_BACKUP 等）
 
-### Dry-run 使用
-默认配置 `deploy.dry_run: true`，可通过 CLI `--dry-run/ --no-dry-run` 控制。
+## 离线安装
 
-### 调试与严格模式开关
-* `--debug / --no-debug`：临时切换日志级别到 DEBUG，便于排查阶段细节；也可在 `cxvoyager/common/config/default.yml` 中将 `logging.debug` 设为 true 或直接把 `logging.level` 调整为 DEBUG。
-* `--strict-validation / --no-strict-validation`：控制规划表校验的严格度。严格模式下，一旦存在任何 warning（如 CIDR 重叠、IPv6 提示），`prepare` 阶段会直接失败，确保问题提前暴露。若不传 CLI 参数，则沿用配置文件 `validation.strict` 的默认值。
+在无外网环境：
 
-### 交互式入口
-运行 `python -m cxvoyager`（或执行项目根目录的 `python main.py`）即可打开交互式主菜单：
+1. 联网准备：运行 `scripts/prepare_offline_packages.py`
+2. 离线安装：交互菜单选择“安装依赖（离线包）”
 
-1. **CLI 模式**：输入任意 Typer 命令（例如 `run --no-dry-run`），即可直接复用现有 CLI 能力；输入 `exit` 返回主菜单。
-2. **Web UI 模式**：按照提示指定监听地址与端口，工具会自动启动 FastAPI 服务（默认端口 8000），浏览器访问 `http://<host>:<port>/docs` 查看接口文档。
-3. **安装依赖（离线包）**：在无外网环境中先执行此选项，工具会调用 `python -m pip install --no-index --find-links utils/resources/offline_packages -r requirements.txt`，将 `utils/resources/offline_packages/` 目录中的离线包装入当前解释器。执行前请确认当前 Python 解释器已经是目标虚拟环境（例如 `.venv`）。
+## 更多文档
 
-主菜单输入 `0`/`exit` 结束程序。
+- [架构设计](docs/ARCHITECTURE.md)
+- [CloudTower 部署设计](docs/CLOUDTOWER_DEPLOYMENT_DESIGN.md)
+- [集群配置设计](docs/CONFIG_CLUSTER_DESIGN.md)
+- [阶段详细文档](docs/INDEX.md)
+- [使用指南](USAGE_WINDOWS.md) / [Linux](USAGE_LINUX.md) / [macOS](USAGE_MACOS.md)
 
-如需了解离线安装的目录结构及命令细节，可参阅 `utils/resources/offline_packages/README.md`。
-
-### 离线依赖准备与安装
-部分现场无法访问互联网时，可以提前在联网机器上准备全部依赖并带到目标环境。
-
-**联网环境准备离线包：**
-
-- 推荐运行 `python scripts/prepare_offline_packages.py`，脚本会自动调用 `pip download` 将 `requirements.txt` 中的依赖下载到 `utils/resources/offline_packages/`。
-- 若更倾向手动操作，可在项目根目录执行 `python -m pip download -r requirements.txt -d utils/resources/offline_packages`，效果等同。
-- 如果需要兼容多操作系统或不同 Python 版本，分别在对应环境重复上述操作，以收集齐全的 wheel/tarball。
-
-**离线环境安装依赖：**
-
-1. 将准备好的 `utils/resources/offline_packages/` 目录（包含所有 `.whl`/`.tar.gz` 文件）拷贝至目标机器的项目根目录。
-2. 进入目标虚拟环境后运行交互式入口，选择“安装依赖（离线包）”。
-3. 安装成功后即可继续选择 CLI 或 Web 模式开展部署。
-
-若安装过程中提示缺少某个包，通常是离线目录中缺失对应的 wheel。请确认以下事项后再试：
-
-- `utils/resources/offline_packages/` 目录内已包含对应模块的 `.whl` 或源代码包。
-- 文件名与目标 Python 版本/平台匹配（例如 `cp310` 对应 Python 3.10）。
-- 如目录为空，说明下载步骤未生效，可重新运行准备脚本并检查输出日志。
-
-
-# 需要做的事项
-这是一个用于自动化部署SmartX环境及应用的工具，使用python语言编写，实现以下目标：
-1. 整体部署工作流如上所示，模块化设计，确保模块之间相对解耦，组合实现每个阶段对应的功能
-2. 集群规划表位于工具同一目录下，名称类似为“05.【模板】SmartX超融合核心平台规划设计表-ELF环境-v20250820.xlsx”，其中模板可能为客户名称，version可能会变化，但是中间的关键词“SmartX超融合”、“规划设计表”和“ELF环境”是固定的，使用模糊匹配的方式定位这个文件作为部署信息来源
-3. 集群规划表中的sheet名称和表头名称存在中文，需要妥善处理编码问题，避免乱码和解析错误
-4. 集群规划表中的信息可能不完整，某些字段为空，需要在代码中处理这些情况，确保部署过程不会因为缺少信息而失败，如果变量具有默认值，则使用默认值，如果不具备默认值（例如Cloudtower管理员密码），则提示用户修改规划表配置
-5. 集群规划表可能存在格式问题，例如单元格合并、隐藏行列等，需要在代码中处理这些情况，确保能够正确解析表格内容
-6. 集群规划表可能存在空格、换行等人为错误，需要在代码中进行清洗和预处理，确保数据的准确性和一致性
-7. 创建一个用于验证集群规划表的模块，验证并输出解析结果和验证结果，对于存在疑问的参数要反馈用户确认，确保表格格式和内容符合预期，避免在部署过程中出现错误
-8. 各个阶段的功能实现需要调用相应的API接口，接口文档和示例见API接口及示例
-9. 代码需要包含详细的注释，解释每个函数和关键代码段的作用，便于后续维护和理解
-10. 代码需要包含错误处理机制，捕获并处理可能出现的异常，确保程序的稳定运行
-11. 代码需要包含日志记录功能，记录每个阶段的操作和结果，便于排查问题和审计
-12. 代码需要包含测试用例，确保各个功能模块的正确性和稳定性
-13. 代码需要遵循PEP8编码规范，确保代码风格一致，易于阅读和维护
-14. 代码需要使用虚拟环境进行开发和运行，确保依赖库的隔离和版本控制
-15. 代码需要提供全局统一的变量表，避免变量和魔法字符串散落在各个模块中，便于统一管理和修改
-16. 代码需要包含版本控制信息，记录每个版本的变更和特性，便于后续维护和升级
-17. 代码需要提供一个帮助文档，解释如何使用该工具，包括安装、配置、运行等步骤
-18. 代码需要提供一个命令行界面，允许用户通过命令行参数控制工具的行为，例如指定某个阶段运行、输出日志文件等
-19. 代码需要提供一个Web界面，允许用户通过Web浏览器访问和管理部署任务，这个部署任务可以是单个阶段，也可以是多个阶段的组合，并且可以查看部署进度和结果，以及下载相关的日志和报告，便于用户操作和监控
-20. 代码需要支持多线程或异步操作，提升部署效率，尤其是在处理多个集群部署时，可以并行执行多个部署任务，减少整体部署时间
-21. 每次修改需要提交到git仓库，并包含清晰简洁的中文提交信息，解释每次修改的内容和原因
-22. 创建一个用于打包和发布该工具的脚本，确保能够便捷简单的将开发环境中的代码和依赖打包成一个可分发的格式，例如zip包，包含所需的一切资源，便于在其他环境中部署和运行
-23. 使用resources文件夹存放一些静态资源文件，例如ico文件、png图片、HTML模板、CSS样式、JavaScript脚本等，确保这些资源文件能够被代码正确引用和使用
-24. 使用config文件夹存放一些配置文件，例如yaml、json、ini等格式的文件，确保这些配置文件能够被代码正确读取和应用
-25. 使用logs文件夹存放一些日志文件，例如部署日志、错误日志、访问日志等，确保这些日志文件能够被代码正确写入和管理
-26. 使用docs文件夹存放一些文档文件，例如README.md、API文档、用户手册等，确保这些文档文件能够被用户正确访问和理解
-27. 使用tests文件夹存放一些测试文件，例如单元测试、集成测试、功能测试等，确保这些测试文件能够被代码正确执行和验证
-28. 使用scripts文件夹存放一些脚本文件，例如部署脚本、清理脚本、辅助脚本等，确保这些脚本文件能够被代码正确调用和运行
-29. 使用utils文件夹存放一些工具文件，例如常用函数、类库、模块等，确保这些工具文件能够被代码正确引用和复用
-30. 使用release文件夹存放一些发布文件，例如打包文件、安装文件、升级文件等，确保这些发布文件能够被用户正确下载和使用
-31. 使用examples文件夹存放一些示例文件，例如示例配置、示例脚本、示例文档等，确保这些示例文件能够被用户正确参考和学习
-32. 开发辅助工具-忽略且无需处理 文件夹下的内容需要忽略且无需处理
-33. 对于当前还未提供的接口文档和示例，比如工作流中的后续阶段，可以通过模拟接口请求和响应的方式，创建一个假的接口文档和示例，确保代码能够正确调用和处理这些接口，便于后续替换为真实的接口文档和示例
