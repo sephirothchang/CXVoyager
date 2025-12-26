@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from cxvoyager.core.deployment.handlers.deploy_cloudtower import CLOUDTOWER_GET_CLUSTERS_ENDPOINT
 from cxvoyager.core.deployment.runtime_context import RunContext
 from cxvoyager.integrations.smartx.api_client import APIClient
+from cxvoyager.common.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +45,27 @@ def query_cluster_by_name(
 ) -> Dict[str, Any]:
     """查询指定名称的集群，返回匹配集群与完整列表，并可写入 ctx.extra。"""
 
-    timeout = int(api_cfg.get("timeout", 10)) if isinstance(api_cfg, dict) else 10
+    timeout = 10
+    if isinstance(api_cfg, dict):
+        raw_timeout = api_cfg.get("timeout", 10)
+        if isinstance(raw_timeout, (int, str)):
+            timeout = int(raw_timeout)
+
     verify_ssl = api_cfg.get("verify_ssl", False) if isinstance(api_cfg, dict) else False
 
-    client = APIClient(base_url=base_url, mock=False, timeout=timeout, verify=verify_ssl)
+    verify: bool | str = (
+    verify_ssl
+    if isinstance(verify_ssl, (bool, str))
+    else False
+    )
+
+    client = APIClient(
+        base_url=base_url,
+        mock=False,
+        timeout=timeout,
+        verify=verify,
+    )
+
     headers = {
         "Authorization": token,
         "content-type": "application/json",
@@ -55,11 +73,11 @@ def query_cluster_by_name(
     payload = {"where": {"name": cluster_name}}
 
     stage_logger.info(
-        "查询 CloudTower 集群信息",
+        tr("deploy.query_cluster.start"),
         progress_extra={"cluster_name": cluster_name, "base_url": base_url.rstrip("/")},
     )
     stage_logger.debug(
-        "get-clusters 请求参数",
+        tr("deploy.query_cluster.request_debug"),
         progress_extra={"payload": payload, "timeout": timeout, "verify_ssl": verify_ssl},
     )
 
@@ -88,7 +106,7 @@ def query_cluster_by_name(
         cached["cluster"] = matched
 
     stage_logger.info(
-        "集群查询完成",
+        tr("deploy.query_cluster.done"),
         progress_extra={"cluster_id": matched.get("id"), "connect_state": matched.get("connect_state")},
     )
     return result

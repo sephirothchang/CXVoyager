@@ -14,6 +14,7 @@ from cxvoyager.common.system_constants import DEFAULT_CONFIG_FILE, PROJECT_ROOT
 from cxvoyager.core.deployment.progress import create_stage_progress_logger
 from cxvoyager.core.deployment.runtime_context import RunContext
 from cxvoyager.core.deployment.stage_manager import Stage
+from cxvoyager.common.i18n import tr
 from cxvoyager.integrations.smartx.api_client import APIClient
 from cxvoyager.core.cloudtower import cloudtower_login
 from cxvoyager.integrations.excel.planning_sheet_parser import find_plan_file, parse_plan, to_model
@@ -107,20 +108,13 @@ def normalize_base_url(base_url: str, *, default_scheme: str = "https") -> str:
 
 
 def _resolve_cloudtower_base_url(ctx: RunContext, api_cfg: Mapping[str, object]) -> str | None:
-    # 1) 显式配置优先：cloudtower_base_url 或通用 base_url。
+    # 优先级：1) 显式配置；2) 规划表模型（ctx.plan）；3) 解析结果（ctx.extra['parsed_plan']）；
+    # 4) 最后退回到 deploy_cloudtower 阶段产物（可能为临时/自动发现的地址）。
     explicit = api_cfg.get("cloudtower_base_url") or api_cfg.get("base_url") if isinstance(api_cfg, dict) else None
     if explicit:
         return str(explicit)
 
-    # 2) 部署阶段产物：deploy_cloudtower 输出的 base_url 或 ip。
-    if isinstance(ctx.extra, dict):
-        deploy_cloudtower = ctx.extra.get("deploy_cloudtower")
-        if isinstance(deploy_cloudtower, dict):
-            base = deploy_cloudtower.get("base_url") or deploy_cloudtower.get("ip")
-            if base:
-                return str(base)
-
-    # 3) 规划表模型：PlanModel.mgmt 中的 CloudTower IP。
+    # 规划表模型优先（如果已经加载）
     plan = getattr(ctx, "plan", None)
     if plan and getattr(plan, "mgmt", None):
         mgmt = plan.mgmt
@@ -128,16 +122,24 @@ def _resolve_cloudtower_base_url(ctx: RunContext, api_cfg: Mapping[str, object])
         if ip_value:
             return str(ip_value)
 
-    # 4) 解析结果字典：ctx.extra['parsed_plan']。
+    # 解析结果字典优先于 deploy 阶段产物
     parsed_plan = ctx.extra.get("parsed_plan") if isinstance(ctx.extra, dict) else None
     if isinstance(parsed_plan, dict):
         mgmt_section = parsed_plan.get("mgmt", {}) if isinstance(parsed_plan, dict) else {}
         records = mgmt_section.get("records") if isinstance(mgmt_section, dict) else None
         if isinstance(records, list) and records:
             record = records[0]
-            ip_value = record.get("Cloudtower IP") or record.get("cloudtower_ip")
+            ip_value = record.get("Cloudtower IP") or record.get("cloudtower_ip") or record.get("Cloudtower_IP")
             if ip_value:
                 return str(ip_value)
+
+    # 回退到 deploy_cloudtower 输出（旧行为）
+    if isinstance(ctx.extra, dict):
+        deploy_cloudtower = ctx.extra.get("deploy_cloudtower")
+        if isinstance(deploy_cloudtower, dict):
+            base = deploy_cloudtower.get("base_url") or deploy_cloudtower.get("ip")
+            if base:
+                return str(base)
 
     return None
 
@@ -197,10 +199,20 @@ def _resolve_cloudtower_token(
             logger_adapter=stage_logger,
         )
     except Exception as exc:  # noqa: BLE001
-        stage_logger.error("CloudTower 登录获取 token 失败", extra={"error": str(exc)})
+        stage_logger.error(tr("deploy.app_upload.login_token_failed"), extra={"error": str(exc)})
         return None
 
     return cloudtower_token
+
+
+def _reset_plan_context(ctx: RunContext, *, keep_source: bool = True) -> None:
+    """Clear cached plan parsing state so a fresh parse will be performed."""
+
+    ctx.plan = None
+    if isinstance(ctx.extra, dict):
+        ctx.extra.pop("parsed_plan", None)
+        if not keep_source:
+            ctx.extra.pop("plan_source", None)
 
 
 def _ensure_plan_loaded(ctx: RunContext) -> None:
@@ -299,7 +311,7 @@ def upload_app(ctx_dict: Dict[str, object], app: AppSpec, stage: Stage) -> Mappi
     client = APIClient(base_url=base_url, mock=False, timeout=timeout, verify=verify_ssl)
 
     stage_logger.info(
-        f"准备上传 {app.abbr} 应用包",
+        tr("deploy.app_upload.prepare_upload", abbr=app.abbr),
         progress_extra={
             "file": package_path.name,
             "base_url": base_url,
@@ -320,11 +332,11 @@ def upload_app(ctx_dict: Dict[str, object], app: AppSpec, stage: Stage) -> Mappi
         try:
             resp = client.post(app.endpoint, payload, headers=headers)
         except Exception as exc:  # pragma: no cover - surfaced
-            stage_logger.error(f"{app.abbr} 应用包上传失败", progress_extra={"error": str(exc)})
+            stage_logger.error(tr("deploy.app_upload.upload_failed", abbr=app.abbr), progress_extra={"error": str(exc)})
             raise RuntimeError(f"{app.abbr} 应用包上传失败: {exc}")
 
         stage_logger.info(
-            f"{app.abbr} 应用包上传已提交",
+            tr("deploy.app_upload.upload_submitted", abbr=app.abbr),
             progress_extra={
                 "id": resp.get("id"),
                 "status": resp.get("status"),

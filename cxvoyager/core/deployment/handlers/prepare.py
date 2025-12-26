@@ -26,6 +26,7 @@ from cxvoyager.core.deployment.prechecks import run_ip_prechecks
 from cxvoyager.common.dependency_checks import check_dependencies
 from cxvoyager.common.system_constants import DEFAULT_CONFIG_FILE
 from cxvoyager.common.config import load_config
+from cxvoyager.common.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 def handle_prepare(ctx_dict):
     ctx: RunContext = ctx_dict['ctx']
     stage_logger = create_stage_progress_logger(ctx, Stage.prepare.value, logger=logger, prefix="[prepare]")
-    stage_logger.info("开始准备阶段，查找并解析规划表")
+    stage_logger.info(tr("deploy.prepare.start"))
     cfg = ctx.config or load_config(DEFAULT_CONFIG_FILE)
     ctx.config = cfg
     cli_opts = ctx.extra.get('cli_options', {})
@@ -43,7 +44,7 @@ def handle_prepare(ctx_dict):
     cli_opts['strict_validation'] = bool(strict_flag)
     plan_file = find_plan_file(ctx.work_dir)
     if not plan_file:
-        raise RuntimeError("未找到规划表文件")
+        raise RuntimeError(tr("deploy.prepare.plan_file_missing"))
     parsed = parse_plan(plan_file)
     ctx.plan = to_model(parsed)
     ctx.extra.setdefault('parsed_plan', parsed)
@@ -59,27 +60,27 @@ def handle_prepare(ctx_dict):
     if selected_set == {Stage.prepare.value, Stage.deploy_cloudtower.value}:
         ctx.extra['run_mode'] = 'cloudtower-only'
     stage_logger.info(
-        "规划表解析完成",
+        tr("deploy.prepare.parse_done"),
         progress_extra={"hosts": len(ctx.plan.hosts), "networks": len(ctx.plan.virtual_network)},
     )
 
     # 结构验证
     report = validate(parsed)
     if not report.get("ok"):
-        stage_logger.error("规划表验证失败", progress_extra={"errors": report["errors"]})
-        raise RuntimeError("规划表验证失败，详见日志")
+        stage_logger.error(tr("deploy.prepare.validate_failed"), progress_extra={"errors": report["errors"]})
+        raise RuntimeError(tr("deploy.prepare.validate_failed_raise"))
     warnings = report.get("warnings", [])
     if strict_flag and warnings:
-        stage_logger.error("严格模式启用，检测到警告", progress_extra={"warnings": warnings})
-        raise RuntimeError("严格模式下不允许存在警告，请检查规划表")
-    stage_logger.info("规划表验证通过", progress_extra={"warnings": len(report.get("warnings", []))})
+        stage_logger.error(tr("deploy.prepare.strict_with_warnings"), progress_extra={"warnings": warnings})
+        raise RuntimeError(tr("deploy.prepare.strict_with_warnings_raise"))
+    stage_logger.info(tr("deploy.prepare.validate_ok"), progress_extra={"warnings": len(report.get("warnings", []))})
 
     # 依赖检查
     deps = check_dependencies(optional=True)
     missing = [k for k, v in deps.items() if not v]
     if missing:
-        raise RuntimeError(f"缺少依赖包: {missing}")
-    stage_logger.info("依赖检查通过")
+        raise RuntimeError(tr("deploy.prepare.deps_missing", missing=missing))
+    stage_logger.info(tr("deploy.prepare.deps_ok"))
 
     # 网络连通性与 IP 占用预检（管理地址、VIP、存储、CloudTower、带外）
     ip_report = run_ip_prechecks(
@@ -94,28 +95,28 @@ def handle_prepare(ctx_dict):
 
     if warning_records:
         stage_logger.warning(
-            "预检存在警告",
+            tr("deploy.prepare.precheck_warning"),
             progress_extra={
                 "warnings": [r.to_dict() for r in warning_records],
             },
         )
     if info_records:
         stage_logger.info(
-            "预检信息提示",
+            tr("deploy.prepare.precheck_info"),
             progress_extra={
                 "infos": [r.to_dict() for r in info_records],
             },
         )
     if error_records:
         stage_logger.error(
-            "预检检测到阻断性错误",
+            tr("deploy.prepare.precheck_error"),
             progress_extra={
                 "errors": [r.to_dict() for r in error_records],
             },
         )
-        raise RuntimeError("IP 预检失败，请处理错误后重试")
+        raise RuntimeError(tr("deploy.prepare.precheck_failed_raise"))
 
-    stage_logger.info("网络与 IP 预检完成", progress_extra={"ip_precheck": ip_report.to_dict()})
+    stage_logger.info(tr("deploy.prepare.precheck_done"), progress_extra={"ip_precheck": ip_report.to_dict()})
     ctx.extra['precheck'] = {
         'deps': deps,
     'network': ip_report.to_dict(),

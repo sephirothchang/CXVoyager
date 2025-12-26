@@ -22,6 +22,7 @@ from statistics import mean
 from cxvoyager.core.deployment.stage_manager import Stage, stage_handler
 from cxvoyager.core.deployment.runtime_context import RunContext
 from cxvoyager.core.deployment.progress import create_stage_progress_logger
+from cxvoyager.common.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ def handle_perf_reliability(ctx_dict):
     stage_logger = create_stage_progress_logger(ctx, Stage.perf_reliability.value, logger=logger, prefix="[perf_reliability]")
     test_vms = ctx.extra.get('create_test_vms', {}).get('vms', [])
     if not test_vms:
-        stage_logger.warning("无测试 VM，跳过性能与可靠性测试 (mock)")
+        stage_logger.warning(tr("deploy.perf_reliability.no_test_vm"))
     # 模拟性能测试：生成随机 IOPS / 带宽 / 延迟
     results = []
     for vm in test_vms:
@@ -54,7 +55,7 @@ def handle_perf_reliability(ctx_dict):
         {'type': 'disk_unplug', 'result': 'recovered'},
         {'type': 'host_power_cycle', 'result': 'recovered'},
     ] if results else []
-    stage_logger.info("性能与可靠性测试汇总", progress_extra=summary)
+    stage_logger.info(tr("deploy.perf_reliability.summary"), progress_extra=summary)
     ctx.extra['perf_reliability'] = {
         'results': results,
         'summary': summary,

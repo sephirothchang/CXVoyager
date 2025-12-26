@@ -34,6 +34,7 @@ from urllib.parse import urlparse
 import openpyxl
 
 from cxvoyager.common.config import load_config
+from cxvoyager.common.i18n import tr
 from cxvoyager.common.system_constants import DEFAULT_CONFIG_FILE
 from cxvoyager.common.network_utils import check_port
 from cxvoyager.core.deployment.progress import create_stage_progress_logger
@@ -264,7 +265,7 @@ def handle_deploy_cloudtower(ctx_dict):
     use_mock = bool(api_cfg.get('mock', False))
 
     stage_logger.info(
-        "开始执行 CloudTower 部署阶段",
+        tr("deploy.deploy_cloudtower.start"),
         progress_extra={"timeout": timeout, "mock_mode": use_mock},
     )
 
@@ -287,7 +288,7 @@ def handle_deploy_cloudtower(ctx_dict):
 
     if not use_mock:
         stage_logger.info(
-            "使用 Fisheye 凭证获取会话 token",
+            tr("deploy.deploy_cloudtower.fisheye_login"),
             progress_extra={"base_url": base_url.rstrip('/')},
         )
         if not _refresh_fisheye_token(
@@ -298,12 +299,12 @@ def handle_deploy_cloudtower(ctx_dict):
         ):
             raise RuntimeError("Fisheye 会话认证失败，无法继续 CloudTower 部署")
     else:
-        stage_logger.debug("Mock 模式跳过 Fisheye 登录步骤")
+        stage_logger.debug(tr("deploy.deploy_cloudtower.fisheye_login_mock_skip"))
 
     json_headers = dict(headers)
     json_headers["content-type"] = "application/json"
     stage_logger.debug(
-        "API 客户端初始化完成",
+        tr("deploy.deploy_cloudtower.api_client_ready"),
         progress_extra={
             "base_url": base_url.rstrip('/'),
             "timeout": timeout,
@@ -325,7 +326,7 @@ def handle_deploy_cloudtower(ctx_dict):
         raise RuntimeError(f"CloudTower ISO 文件为空: {iso_path}")
 
     stage_logger.info(
-        "准备上传 CloudTower ISO",
+        tr("deploy.deploy_cloudtower.iso_upload_prepare"),
         progress_extra={"path": str(iso_path), "size": iso_size},
     )
 
@@ -633,7 +634,10 @@ def _ensure_host_scan_context(
             if parsed.hostname:
                 candidates.append(parsed.hostname)
         except Exception:  # noqa: BLE001
-            stage_logger.debug("解析 base_url 失败，忽略", progress_extra={"base_url": base_url})
+            stage_logger.debug(
+                tr("deploy.deploy_cloudtower.base_url_parse_failed"),
+                progress_extra={"base_url": base_url},
+            )
 
     if parsed_plan is None:
         parsed_plan = ctx.extra.get('parsed_plan') if isinstance(ctx.extra, dict) else None
@@ -649,7 +653,7 @@ def _ensure_host_scan_context(
 
     if not candidates:
         stage_logger.warning(
-            "未检测到主机扫描结果，且无法从规划表推导主机 IP，后续将尝试仅依赖规划表数据继续部署。",
+            tr("deploy.deploy_cloudtower.host_scan_missing_plan_fallback"),
         )
         return {}
 
@@ -659,7 +663,7 @@ def _ensure_host_scan_context(
         ctx.extra['host_scan'] = stub
 
     stage_logger.info(
-        "未检测到主机扫描结果，已根据规划表补充最小 host_scan 数据。",
+        tr("deploy.deploy_cloudtower.host_scan_stub_created"),
         progress_extra={"host_ip": primary_ip},
     )
     return stub
@@ -960,7 +964,10 @@ def _resolve_cloudtower_ip(
     mgmt_info = getattr(plan, "mgmt", None) if plan else None
     if mgmt_info and getattr(mgmt_info, "Cloudtower_IP", None):
         ip_value = str(getattr(mgmt_info, "Cloudtower_IP"))
-        stage_logger.debug("从规划表 mgmt 区域读取 CloudTower IP", progress_extra={"ip": ip_value})
+        stage_logger.debug(
+            tr("deploy.deploy_cloudtower.ip_from_plan_mgmt"),
+            progress_extra={"ip": ip_value},
+        )
         return ip_value
 
     if isinstance(parsed_plan, dict):
@@ -971,7 +978,10 @@ def _resolve_cloudtower_ip(
             ip_value = record.get("Cloudtower IP") or record.get("cloudtower_ip")
             if ip_value:
                 ip_str = str(ip_value)
-                stage_logger.debug("从解析后的规划表字典读取 CloudTower IP", progress_extra={"ip": ip_str})
+                stage_logger.debug(
+                    tr("deploy.deploy_cloudtower.ip_from_parsed_plan"),
+                    progress_extra={"ip": ip_str},
+                )
                 return ip_str
 
     if isinstance(iso_cfg, dict):
@@ -981,12 +991,12 @@ def _resolve_cloudtower_ip(
             if ip_override:
                 ip_str = str(ip_override)
                 stage_logger.info(
-                    "使用配置文件中的 CloudTower IP 覆盖",
+                    tr("deploy.deploy_cloudtower.ip_override_config"),
                     progress_extra={"ip": ip_str},
                 )
                 return ip_str
 
-    stage_logger.warning("未在规划表或配置中找到 CloudTower IP，将继续尝试后续步骤")
+    stage_logger.warning(tr("deploy.deploy_cloudtower.ip_missing"))
     return None
 
 
@@ -1139,12 +1149,12 @@ def _pick_management_network(
             key in net_type for key in ("管理", "mgmt", "cloudtower")
         ):
             stage_logger.debug(
-                "优先匹配到可能的管理网络",
+                tr("deploy.deploy_cloudtower.mgmt_network_prefer"),
                 progress_extra={"network_name": record.get("name"), "metadata": meta},
             )
             return record
 
-    stage_logger.debug("未找到显式管理网络，回退使用第一条网络记录")
+    stage_logger.debug(tr("deploy.deploy_cloudtower.mgmt_network_fallback"))
     return candidates[0] if candidates else None
 
 
@@ -1159,7 +1169,10 @@ def _deploy_cloudtower_virtual_machine(
 ) -> None:
     """通过 Fisheye API 创建 CloudTower 虚拟机并完成初始网络配置。"""
 
-    stage_logger.info("开始创建 CloudTower 虚拟机", progress_extra={"vm_name": deployment_plan.vm.vm_name})
+    stage_logger.info(
+        tr("deploy.deploy_cloudtower.vm_create_start"),
+        progress_extra={"vm_name": deployment_plan.vm.vm_name},
+    )
 
     storage_uuid = _query_storage_policy_uuid(
         ctx=ctx,
@@ -1266,7 +1279,10 @@ def _query_storage_policy_uuid(
     若 Fisheye API 返回 401，将尝试使用规划表中的管理员账号刷新 token 后重试一次。
     """
 
-    stage_logger.info("查询存储策略", progress_extra={"policy_name": policy_name})
+    stage_logger.info(
+        tr("deploy.deploy_cloudtower.storage_policy_query"),
+        progress_extra={"policy_name": policy_name},
+    )
 
     try:
         response = client.get(CLOUDTOWER_STORAGE_POLICIES_ENDPOINT, headers=headers)
@@ -1275,7 +1291,7 @@ def _query_storage_policy_uuid(
             raise
 
         stage_logger.warning(
-            "Fisheye API 返回 401，尝试使用规划表凭证重新登录",
+            tr("deploy.deploy_cloudtower.fisheye_401_retry"),
             progress_extra={"policy_name": policy_name},
         )
         if not _refresh_fisheye_token(
@@ -1295,7 +1311,7 @@ def _query_storage_policy_uuid(
             if not uuid:
                 break
             stage_logger.debug(
-                "匹配到存储策略",
+                tr("deploy.deploy_cloudtower.storage_policy_matched"),
                 progress_extra={"policy_name": name, "uuid": uuid},
             )
             return str(uuid)
@@ -1309,7 +1325,7 @@ def _query_storage_policy_uuid(
         raise RuntimeError("未能获取存储策略 UUID，请检查 Fisheye API 返回值")
 
     stage_logger.warning(
-        "未找到指定名称的存储策略，回退使用第一条记录",
+        tr("deploy.deploy_cloudtower.storage_policy_fallback"),
         progress_extra={"fallback_name": fallback.get("name"), "uuid": uuid},
     )
     return str(uuid)
@@ -1377,7 +1393,10 @@ def _resolve_vds_details(
     if not vds_name:
         raise RuntimeError("未提供 VDS 名称，无法定位管理网络")
 
-    stage_logger.info("匹配管理网络 VDS", progress_extra={"vds_name": vds_name})
+    stage_logger.info(
+        tr("deploy.deploy_cloudtower.vds_match"),
+        progress_extra={"vds_name": vds_name},
+    )
     response = client.get(CLOUDTOWER_VDS_ENDPOINT, headers=headers)
     vds_list = _extract_data_list(response)
     for vds in vds_list:
@@ -1388,7 +1407,7 @@ def _resolve_vds_details(
             if not uuid or not ovs_name:
                 break
             stage_logger.debug(
-                "找到目标 VDS",
+                tr("deploy.deploy_cloudtower.vds_found"),
                 progress_extra={"uuid": uuid, "ovs_name": ovs_name},
             )
             return str(uuid), str(ovs_name)
@@ -1503,13 +1522,19 @@ def _create_cloudtower_vm(
             }
         )
 
-    stage_logger.info("提交 CloudTower 虚拟机创建请求", progress_extra={"payload_keys": sorted(payload.keys())})
+    stage_logger.info(
+        tr("deploy.deploy_cloudtower.vm_create_submit"),
+        progress_extra={"payload_keys": sorted(payload.keys())},
+    )
     response = client.post(CLOUDTOWER_VM_ENDPOINT, payload, headers=headers)
     job_id = _extract_job_id(response)
     vm_uuid = _extract_vm_uuid_from_response(response)
     if not job_id:
         raise RuntimeError("创建 CloudTower 虚拟机接口未返回 job_id")
-    stage_logger.debug("创建虚拟机返回信息", progress_extra={"job_id": job_id, "vm_uuid": vm_uuid})
+    stage_logger.debug(
+        tr("deploy.deploy_cloudtower.vm_create_response"),
+        progress_extra={"job_id": job_id, "vm_uuid": vm_uuid},
+    )
     return vm_uuid, job_id
 
 
@@ -1551,7 +1576,10 @@ def _poll_cloudtower_job(
 ) -> Dict[str, Any]:
     """轮询 CloudTower 后端任务直至成功或超时。"""
 
-    stage_logger.info("开始轮询任务状态", progress_extra={"job_id": job_id, "description": description})
+    stage_logger.info(
+        tr("deploy.deploy_cloudtower.job_poll_start"),
+        progress_extra={"job_id": job_id, "description": description},
+    )
     deadline = time.monotonic() + timeout
     last_state: Optional[str] = None
 
@@ -1561,12 +1589,15 @@ def _poll_cloudtower_job(
         state = str(job.get("state") or "").lower()
         if state != last_state:
             stage_logger.debug(
-                "任务状态更新",
+                tr("deploy.deploy_cloudtower.job_state_update"),
                 progress_extra={"job_id": job_id, "state": state, "description": description},
             )
             last_state = state
         if state in {"done", "success", "succeed", "finished"}:
-            stage_logger.info("任务已完成", progress_extra={"job_id": job_id, "description": description})
+            stage_logger.info(
+                tr("deploy.deploy_cloudtower.job_done"),
+                progress_extra={"job_id": job_id, "description": description},
+            )
             return job
         if state in {"failed", "error", "aborted"}:
             detail = job.get("error") or job.get("message") or job
@@ -1727,7 +1758,10 @@ def _fetch_vm_primary_mac(
     if not mac:
         raise RuntimeError("未能找到虚拟机网卡的 MAC 地址")
 
-    stage_logger.debug("获取到虚拟机 MAC", progress_extra={"vm_uuid": vm_uuid, "mac": mac})
+    stage_logger.debug(
+        tr("deploy.deploy_cloudtower.vm_mac_obtained"),
+        progress_extra={"vm_uuid": vm_uuid, "mac": mac},
+    )
     return str(mac)
 
 
@@ -1805,11 +1839,11 @@ def _install_and_verify_cloudtower_services(
 
     target_ip = deployment_plan.cloudtower_ip or deployment_plan.network.ip_address
     if not target_ip:
-        stage_logger.warning("缺少 CloudTower IP，跳过服务部署阶段")
+        stage_logger.warning(tr("deploy.deploy_cloudtower.service_skip_no_ip"))
         return
 
     stage_logger.info(
-        "准备通过 SSH 部署 CloudTower 服务",
+        tr("deploy.deploy_cloudtower.ssh_deploy_start"),
         progress_extra={"ip": target_ip, "ssh_user": deployment_plan.ssh.username, "ssh_port": deployment_plan.ssh.port},
     )
 
@@ -1827,7 +1861,7 @@ def _install_and_verify_cloudtower_services(
             password=deployment_plan.ssh.password,
             timeout=deployment_plan.ssh.timeout,
         )
-        stage_logger.debug("SSH 连接成功", progress_extra={"ip": target_ip})
+        stage_logger.debug(tr("deploy.deploy_cloudtower.ssh_connected"), progress_extra={"ip": target_ip})
 
         log_ssh_client = _create_ssh_client_and_connect(
             target_ip,
@@ -1836,7 +1870,7 @@ def _install_and_verify_cloudtower_services(
             password=deployment_plan.ssh.password,
             timeout=deployment_plan.ssh.timeout,
         )
-        stage_logger.debug("日志监控 SSH 连接就绪", progress_extra={"ip": target_ip})
+        stage_logger.debug(tr("deploy.deploy_cloudtower.ssh_log_connected"), progress_extra={"ip": target_ip})
 
         monitor_executor = ThreadPoolExecutor(max_workers=1)
         monitor_future = monitor_executor.submit(
@@ -1968,7 +2002,10 @@ def _run_sudo_command(
     """在远程主机上执行带 sudo 的命令，可用于后台任务。"""
 
     full_command = f"sudo -S {command}"
-    stage_logger.info(description, progress_extra={"command": command})
+    stage_logger.info(
+        tr("deploy.deploy_cloudtower.run_command", description=description),
+        progress_extra={"command": command},
+    )
     stdin, stdout, stderr = ssh_client.exec_command(_wrap_with_bash(full_command), get_pty=True)
     if ssh_config.password:
         stdin.write(f"{ssh_config.password}\n")
@@ -1986,17 +2023,20 @@ def _run_sudo_command(
 
     if stdout_data:
         stage_logger.debug(
-            f"{description}输出",
+            tr("deploy.deploy_cloudtower.command_output", description=description),
             progress_extra={"stdout": stdout_data.splitlines()[-5:]},
         )
     if stderr_data:
         stage_logger.warning(
-            f"{description}产生警告",
+            tr("deploy.deploy_cloudtower.command_warning", description=description),
             progress_extra={"stderr": stderr_data.splitlines()[-5:]},
         )
 
     if background:
-        stage_logger.debug("后台命令已提交", progress_extra={"command": command})
+        stage_logger.debug(
+            tr("deploy.deploy_cloudtower.background_command_submitted"),
+            progress_extra={"command": command},
+        )
 
 
 def _wait_for_installation_success(
@@ -2032,6 +2072,10 @@ def _wait_for_installation_success(
                     "最新 installer.out 片段",
                     progress_extra={"elapsed": elapsed, "lines": excerpt[-5:]},
                 )
+                stage_logger.info(
+                    "部署日志已更新，请耐心等待",
+                )
+
                 last_excerpt = excerpt
         elif not exists and elapsed < grace_period:
             stage_logger.debug(
@@ -2071,7 +2115,10 @@ def _fetch_installer_status(
     stdout_data = stdout.read().decode('utf-8', 'ignore')
     stderr_data = stderr.read().decode('utf-8', 'ignore')
     if stderr_data:
-        stage_logger.debug("读取 installer.out 警告", progress_extra={"stderr": stderr_data.splitlines()[-5:]})
+        stage_logger.debug(
+            tr("deploy.deploy_cloudtower.installer_warn"),
+            progress_extra={"stderr": stderr_data.splitlines()[-5:]},
+        )
 
     if "__CXV_NO_FILE__" in stdout_data:
         return False, False, []
@@ -2085,17 +2132,20 @@ def _verify_cloudtower_https_port(*, ip: str, stage_logger: LoggerAdapter) -> No
     """检测 CloudTower 443 端口是否可访问，支持重试。"""
 
     stage_logger.info(
-        "验证 CloudTower HTTPS 端口连通性",
+        tr("deploy.deploy_cloudtower.https_verify"),
         progress_extra={"ip": ip, "port": CLOUDTOWER_HTTPS_PORT, "retries": CLOUDTOWER_PORT_RETRY},
     )
 
     for attempt in range(1, CLOUDTOWER_PORT_RETRY + 1):
         reachable = check_port(ip, CLOUDTOWER_HTTPS_PORT, timeout=5.0)
         if reachable:
-            stage_logger.info("443 端口可达，CloudTower 服务已就绪", progress_extra={"attempt": attempt})
+            stage_logger.info(
+                tr("deploy.deploy_cloudtower.https_ready"),
+                progress_extra={"attempt": attempt},
+            )
             return
         stage_logger.warning(
-            "443 端口暂不可达，稍后重试",
+            tr("deploy.deploy_cloudtower.https_retry"),
             progress_extra={"attempt": attempt, "wait": CLOUDTOWER_PORT_RETRY_INTERVAL},
         )
         time.sleep(CLOUDTOWER_PORT_RETRY_INTERVAL)
@@ -2117,7 +2167,7 @@ def _configure_cloudtower_post_install(
 
     cloudtower_ip = deployment_plan.cloudtower_ip or deployment_plan.network.ip_address
     if not cloudtower_ip:
-        stage_logger.warning("缺少 CloudTower IP，无法执行后续初始化配置")
+        stage_logger.warning(tr("deploy.deploy_cloudtower.post_install_missing_ip"))
         return {}
 
     inputs = _resolve_cloudtower_setup_inputs(
@@ -2130,12 +2180,15 @@ def _configure_cloudtower_post_install(
     if masked_inputs.get("cluster_password"):
         masked_inputs["cluster_password"] = "***"
     stage_logger.debug(
-        "CloudTower 初始化参数",
+        tr("deploy.deploy_cloudtower.init_params"),
         progress_extra={"cloudtower_ip": cloudtower_ip, "inputs": masked_inputs},
     )
 
     if use_mock:
-        stage_logger.info("Mock 模式跳过 CloudTower 后续配置", progress_extra={"cloudtower_ip": cloudtower_ip})
+        stage_logger.info(
+            tr("deploy.deploy_cloudtower.mock_skip_post_install"),
+            progress_extra={"cloudtower_ip": cloudtower_ip},
+        )
         result = asdict(inputs)
         return {
             "mode": "mock",
@@ -2144,7 +2197,7 @@ def _configure_cloudtower_post_install(
         }
 
     stage_logger.info(
-        "开始执行 CloudTower 初始化配置",
+        tr("deploy.deploy_cloudtower.init_start"),
         progress_extra={"cloudtower_ip": cloudtower_ip, "organization": inputs.organization_name},
     )
     client = APIClient(
@@ -2208,7 +2261,7 @@ def _configure_cloudtower_post_install(
                 )
                 plan_updates["cloudtower_serial"] = {"status": "ok", "path": str(plan_path)}
         else:
-            stage_logger.warning("未找到规划表路径，CloudTower 序列号未写入规划表")
+            stage_logger.warning(tr("deploy.deploy_cloudtower.serial_plan_missing"))
 
     result = {
         "organization": {
@@ -2278,7 +2331,7 @@ def _resolve_cloudtower_setup_inputs(
     cluster_creds = _extract_cluster_credentials(parsed_plan, cloud_cfg)
 
     if not cluster_vip:
-        stage_logger.warning("未能从规划表解析集群 VIP，将在后续步骤中提示用户补充")
+        stage_logger.warning(tr("deploy.deploy_cloudtower.cluster_vip_missing"))
 
     return CloudTowerSetupInputs(
         organization_name=str(organization_name).strip() if organization_name else CLOUDTOWER_DEFAULT_ORGANIZATION_NAME,
@@ -2352,7 +2405,10 @@ def _cloudtower_create_root_user(*, client: APIClient, stage_logger: LoggerAdapt
         ignore_messages=("already exists", "UserAlreadyExists"),
     )
     if data:
-        stage_logger.debug("CloudTower root 用户创建返回", progress_extra={"keys": list(data.keys())})
+        stage_logger.debug(
+            tr("deploy.deploy_cloudtower.root_user_debug"),
+            progress_extra={"keys": list(data.keys())},
+        )
 
 
 def _cloudtower_create_organization(
@@ -2375,7 +2431,7 @@ def _cloudtower_create_organization(
     )
     org = (data or {}).get("createOrganization") if isinstance(data, dict) else None
     stage_logger.info(
-        "CloudTower 组织已就绪",
+        tr("deploy.deploy_cloudtower.organization_ready"),
         progress_extra={"organization_name": organization_name, "organization_id": org.get("id") if isinstance(org, dict) else None},
     )
     return org or {}
@@ -2391,7 +2447,10 @@ def _cloudtower_check_setup(*, client: APIClient, stage_logger: LoggerAdapter) -
         ignore_messages=(),
     )
     if data:
-        stage_logger.debug("CloudTower 初始化状态", progress_extra={"keys": list(data.keys())})
+        stage_logger.debug(
+            tr("deploy.deploy_cloudtower.init_state_debug"),
+            progress_extra={"keys": list(data.keys())},
+        )
     return data or {}
 
 
@@ -2422,7 +2481,7 @@ def _cloudtower_login(
             token = str(response.get("token"))
     if not token:
         raise RuntimeError("CloudTower 登录未返回 token")
-    stage_logger.info("已获取 CloudTower 会话 token")
+    stage_logger.info(tr("deploy.deploy_cloudtower.login_token_obtained"))
     return token
 
 
@@ -2440,7 +2499,10 @@ def _cloudtower_update_ntp(*, client: APIClient, stage_logger: LoggerAdapter, se
         description="配置 CloudTower NTP",
         ignore_messages=(),
     )
-    stage_logger.info("已更新 CloudTower NTP 配置", progress_extra={"servers": servers, "response": data})
+    stage_logger.info(
+        tr("deploy.deploy_cloudtower.ntp_updated"),
+        progress_extra={"servers": servers, "response": data},
+    )
 
 
 def _cloudtower_query_license(*, client: APIClient, stage_logger: LoggerAdapter) -> Dict[str, Any]:
@@ -2457,11 +2519,11 @@ def _cloudtower_query_license(*, client: APIClient, stage_logger: LoggerAdapter)
         license_info = deploys[0].get("license") if isinstance(deploys[0], dict) else None
         if isinstance(license_info, dict):
             stage_logger.info(
-                "已获取 CloudTower 许可证信息",
+                tr("deploy.deploy_cloudtower.license_obtained"),
                 progress_extra={"license_serial": license_info.get("license_serial")},
             )
             return license_info
-    stage_logger.warning("未获取到 CloudTower 许可证信息")
+    stage_logger.warning(tr("deploy.deploy_cloudtower.license_missing"))
     return {}
 
 
@@ -2485,7 +2547,13 @@ def _post_cloudtower_graphql(
         messages = " | ".join(str(err.get("message", err)) for err in errors if isinstance(err, dict))
         lowered = messages.lower()
         if any(keyword.lower() in lowered for keyword in ignore_messages):
-            stage_logger.warning("%s出现可忽略的提示: %s", description, messages)
+            stage_logger.warning(
+                tr(
+                    "deploy.deploy_cloudtower.graphql_ignore_warning",
+                    description=description,
+                    messages=messages,
+                )
+            )
         else:
             raise RuntimeError(f"{description}失败: {messages}")
     return response.get("data", {}) if isinstance(response, dict) else {}
@@ -2499,13 +2567,13 @@ def _update_cloudtower_dns_via_ssh(
 ) -> None:
     target_ip = deployment_plan.cloudtower_ip or deployment_plan.network.ip_address
     if not target_ip:
-        stage_logger.warning("缺少 CloudTower IP，跳过 DNS 配置")
+        stage_logger.warning(tr("deploy.deploy_cloudtower.dns_skip_no_ip"))
         return
     if not dns_servers:
         return
 
     stage_logger.info(
-        "通过 SSH 更新 CloudTower DNS 配置",
+        tr("deploy.deploy_cloudtower.dns_update"),
         progress_extra={"ip": target_ip, "servers": dns_servers},
     )
 
@@ -2527,11 +2595,9 @@ def _update_cloudtower_dns_via_ssh(
                 timeout=deployment_plan.ssh.timeout,
             )
             content = "\n".join(f"nameserver {server}" for server in dns_servers)
-            command = (
-                "sudo cat <<'EOF' | sudo tee /etc/resolv.conf >/dev/null\n"
-                + content.replace("'", "'\\''")
-                + "\nEOF"
-            )
+            # 使用 printf + tee，避免在命令内重复使用 sudo 和 heredoc 导致密码/stdin 交互冲突。
+            args = " ".join(shlex.quote(line) for line in content.splitlines())
+            command = f"printf '%s\\n' {args} | tee /etc/resolv.conf >/dev/null"
             _run_sudo_command(
                 ssh_client=ssh_client,
                 ssh_config=deployment_plan.ssh,
@@ -2541,7 +2607,7 @@ def _update_cloudtower_dns_via_ssh(
             )
         except Exception as exc:  # noqa: BLE001 - DNS 写入失败不应阻断流程
             stage_logger.warning(
-                "DNS 配置尝试失败，将跳过且继续部署",
+                tr("deploy.deploy_cloudtower.dns_update_failed"),
                 progress_extra={"ip": target_ip, "servers": dns_servers, "error": str(exc)},
             )
     finally:
@@ -2591,7 +2657,7 @@ def _find_existing_cloudtower_iso(
     iso_name = str(iso_cfg.get('name') or iso_path.name)
 
     stage_logger.info(
-        "查询 CloudTower 上已存在的 ISO",
+        tr("deploy.deploy_cloudtower.iso_query_existing"),
         progress_extra={"file_name": iso_name, "file_size": iso_size},
     )
 
@@ -2609,17 +2675,17 @@ def _find_existing_cloudtower_iso(
     except APIError as exc:
         if "status=401" not in str(exc):
             stage_logger.warning(
-                "查询 CloudTower ISO 列表失败，将继续上传",
+                tr("deploy.deploy_cloudtower.iso_list_fail_continue"),
                 progress_extra={"error": str(exc), "file_name": iso_name},
             )
-            stage_logger.debug("查询 CloudTower ISO 列表异常详情", exc_info=exc)
+            stage_logger.debug(tr("deploy.deploy_cloudtower.iso_list_error_detail"), exc_info=exc)
             return None
 
         stage_logger.warning(
-            "查询 CloudTower ISO 列表返回 401，尝试刷新 token",
+            tr("deploy.deploy_cloudtower.iso_list_401_retry"),
             progress_extra={"file_name": iso_name},
         )
-        stage_logger.debug("查询 CloudTower ISO 列表 401 异常详情", exc_info=exc)
+        stage_logger.debug(tr("deploy.deploy_cloudtower.iso_list_401_error_detail"), exc_info=exc)
         if not _refresh_fisheye_token(
             ctx=ctx,
             client=client,
@@ -2627,7 +2693,7 @@ def _find_existing_cloudtower_iso(
             stage_logger=stage_logger,
         ):
             stage_logger.error(
-                "刷新 token 失败，无法复用已存在的 ISO",
+                tr("deploy.deploy_cloudtower.iso_token_refresh_failed"),
                 progress_extra={"file_name": iso_name},
             )
             return None
@@ -2635,23 +2701,23 @@ def _find_existing_cloudtower_iso(
             response = client.get(CLOUDTOWER_IMAGES_ENDPOINT, params=params, headers=headers)
         except Exception as retry_exc:  # noqa: BLE001
             stage_logger.warning(
-                "刷新 token 后查询 CloudTower ISO 仍失败，将继续上传",
+                tr("deploy.deploy_cloudtower.iso_list_retry_fail"),
                 progress_extra={"error": str(retry_exc), "file_name": iso_name},
             )
-            stage_logger.debug("刷新 token 后查询 CloudTower ISO 异常详情", exc_info=retry_exc)
+            stage_logger.debug(tr("deploy.deploy_cloudtower.iso_list_retry_error_detail"), exc_info=retry_exc)
             return None
     except Exception as exc:  # noqa: BLE001 - 捕获网络异常
         stage_logger.warning(
-            "查询 CloudTower ISO 列表出现异常，将继续上传",
+            tr("deploy.deploy_cloudtower.iso_list_exception"),
             progress_extra={"error": str(exc), "file_name": iso_name},
         )
-        stage_logger.debug("查询 CloudTower ISO 列表异常详情", exc_info=exc)
+        stage_logger.debug(tr("deploy.deploy_cloudtower.iso_list_error_detail"), exc_info=exc)
         return None
 
     images = _extract_data_list(response)
     if not images:
         stage_logger.debug(
-            "CloudTower 上未找到已上传的 ISO",
+            tr("deploy.deploy_cloudtower.iso_not_found_debug"),
             progress_extra={"file_name": iso_name},
         )
         return None

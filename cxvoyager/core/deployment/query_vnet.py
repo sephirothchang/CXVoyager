@@ -6,6 +6,7 @@ import logging
 from typing import Dict, Any
 
 from cxvoyager.integrations.smartx.api_client import APIClient
+from cxvoyager.common.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ def query_vnet_by_name(
     headers = {"Authorization": token}
     payload: Dict[str, Any] = {"where": {"name": name}}
 
-    stage_logger.info("查询虚拟网络", progress_extra={"name": name, "endpoint": GET_VLANS_ENDPOINT})
+    stage_logger.info(tr("deploy.query_vnet.start"), progress_extra={"name": name, "endpoint": GET_VLANS_ENDPOINT})
     resp = client.post(GET_VLANS_ENDPOINT, payload=payload, headers=headers)
 
     if isinstance(resp, list):
@@ -49,7 +50,7 @@ def query_vnet_by_name(
             vnet_id = item.get("id")
             if not vnet_id:
                 break
-            stage_logger.info("已找到虚拟网络", progress_extra={"id": vnet_id})
+            stage_logger.info(tr("deploy.query_vnet.found"), progress_extra={"id": vnet_id})
             return str(vnet_id)
 
     raise RuntimeError(f"未找到名称为 {name} 的虚拟网络")

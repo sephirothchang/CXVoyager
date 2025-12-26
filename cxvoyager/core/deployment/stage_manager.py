@@ -24,6 +24,7 @@ from typing import Any, Callable, Dict, List, Optional
 import importlib
 import pkgutil
 from .runtime_context import RunContext
+from cxvoyager.common.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -109,31 +110,31 @@ _STAGE_METADATA: Dict[Stage, StageInfo] = {
     Stage.deploy_obs: StageInfo(
         name=Stage.deploy_obs.value,
         label="部署 OBS",
-        description="上传并登记 Observability 应用包。",
+        description="上传并部署 Observability 应用包。",
         group="业务交付",
     ),
     Stage.deploy_bak: StageInfo(
         name=Stage.deploy_bak.value,
         label="部署 BAK",
-        description="上传并登记 Backup 应用包。",
+        description="上传并部署 Backup 应用包。",
         group="业务交付",
     ),
     Stage.deploy_er: StageInfo(
         name=Stage.deploy_er.value,
         label="部署 ER",
-        description="上传并登记 ER 应用包。",
+        description="上传并部署 ER 应用包。",
         group="业务交付",
     ),
     Stage.deploy_sfs: StageInfo(
         name=Stage.deploy_sfs.value,
         label="部署 SFS",
-        description="上传并登记 SFS 应用包。",
+        description="上传并部署 SFS 应用包。",
         group="业务交付",
     ),
     Stage.deploy_sks: StageInfo(
         name=Stage.deploy_sks.value,
         label="部署 SKS",
-        description="上传并登记 SKS 应用包。",
+        description="上传并部署 SKS 应用包。",
         group="业务交付",
     ),
     Stage.create_test_vms: StageInfo(
@@ -151,7 +152,7 @@ _STAGE_METADATA: Dict[Stage, StageInfo] = {
     Stage.cleanup: StageInfo(
         name=Stage.cleanup.value,
         label="收尾清理",
-        description="回收临时资源、清理凭据并归档部署材料。",
+        description="配置调优、回收临时资源、清理凭据并归档部署材料。",
         group="收尾",
     ),
 }
@@ -216,9 +217,9 @@ def raise_if_aborted(
     if signal is None or not signal.is_set():
         return
 
-    message = "检测到终止请求，正在停止后续操作"
+    message = tr("deploy.stage_manager.abort_detected")
     if hint:
-        message = f"{message}（{hint}）"
+        message = tr("deploy.stage_manager.abort_detected_hint", hint=hint)
     if stage_logger is not None:
         stage_logger.warning(message)
     else:
@@ -238,7 +239,7 @@ def run_stages(
         try:
             pkg = importlib.import_module(package)
         except ImportError:  # pragma: no cover
-            logger.warning("无法导入handlers包")
+            logger.error(tr("deploy.stage_manager.import_handlers_failed"))
         else:
             for m in pkgutil.walk_packages(pkg.__path__, pkg.__name__ + "."):
                 importlib.import_module(m.name)
@@ -246,23 +247,23 @@ def run_stages(
     for st in selected:
         handler = _STAGE_HANDLERS.get(st)
         if not handler:
-            logger.warning("阶段 %s 尚未实现", st.value)
+            logger.warning(tr("deploy.stage_manager.handler_missing", stage=st.value))
             continue
         if abort_signal is not None and abort_signal.is_set():
-            logger.warning("终止信号已触发，停止执行后续阶段")
+            logger.warning(tr("deploy.stage_manager.abort_signal_triggered"))
             raise AbortRequestedError("部署任务已被外部终止")
-        logger.info("开始阶段: %s", st.value)
+        logger.info(tr("deploy.stage_manager.start_stage", stage=st.value))
         ctx_obj = ctx.get("ctx")
         run_ctx = ctx_obj if isinstance(ctx_obj, RunContext) else None
         if progress_callback:
             progress_callback("start", st, run_ctx)
         handler(ctx)
         if abort_signal is not None and abort_signal.is_set():
-            logger.warning("阶段 %s 执行过程中收到终止信号", st.value)
+            logger.warning(tr("deploy.stage_manager.abort_during_stage", stage=st.value))
             raise AbortRequestedError("部署任务已被外部终止")
         if isinstance(run_ctx, RunContext):
             run_ctx.completed_stages.append(st.value)
         if progress_callback:
             progress_callback("complete", st, run_ctx)
-        logger.info("结束阶段: %s", st.value)
+        logger.info(tr("deploy.stage_manager.end_stage", stage=st.value))
 

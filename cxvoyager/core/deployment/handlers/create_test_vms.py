@@ -20,6 +20,7 @@ import logging
 from cxvoyager.core.deployment.stage_manager import Stage, stage_handler
 from cxvoyager.core.deployment.runtime_context import RunContext
 from cxvoyager.core.deployment.progress import create_stage_progress_logger
+from cxvoyager.common.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -41,5 +42,5 @@ def handle_create_test_vms(ctx_dict):
                 'net': 'mgmt-net',
                 'size_gb': 20,
             })
-    stage_logger.info("规划测试 VM", progress_extra={"vm_count": len(vm_plan)})
+    stage_logger.info(tr("deploy.create_test_vms.plan"), progress_extra={"vm_count": len(vm_plan)})
     ctx.extra['create_test_vms'] = {'vms': vm_plan, 'status': 'SUCCESS'}

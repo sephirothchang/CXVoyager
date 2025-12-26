@@ -35,6 +35,7 @@ from cxvoyager.models.deployment_payload_models import (
     NetworkServiceConfig, NetworkRouteConfig, NetworkModeConfig, NTPConfig
 )
 from cxvoyager.common.ip_utils import pick_prefer_ipv6
+from cxvoyager.common.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ class DeploymentPayloadGenerator:
         }
         
         self.saved_artifact_path = self._persist_payload(payload, cluster_name)
-        logger.info("集群部署载荷生成完成: %s，已保存到 %s", cluster_name, self.saved_artifact_path)
+        logger.info(tr("deploy.payload_builder.generate_done", cluster_name=cluster_name, path=self.saved_artifact_path))
         return payload
 
     def _resolve_artifact_dir(self, override: Union[Path, str, None]) -> Path:
@@ -107,7 +108,7 @@ class DeploymentPayloadGenerator:
             with target_path.open("w", encoding="utf-8") as fh:
                 json.dump(payload, fh, ensure_ascii=False, indent=2)
         except Exception as exc:  # noqa: BLE001 - ensure持久化失败不会悄然吞掉
-            logger.exception("保存部署载荷到 %s 失败", target_dir)
+            logger.exception(tr("deploy.payload_builder.persist_failed", path=target_dir))
             raise RuntimeError("保存部署载荷失败") from exc
         return target_path
     
@@ -290,7 +291,7 @@ class DeploymentPayloadGenerator:
             self._vds_role_to_name[role] = vds_name
 
         if not selected_entries:
-            logger.warning("未找到VDS配置，使用默认配置")
+            logger.warning(tr("deploy.payload_builder.default_vds"))
 
         defaults = {
             "mgmt": {"name": "VDS-MGT", "bond_mode": "active-backup"},
@@ -486,7 +487,7 @@ class DeploymentPayloadGenerator:
         """构建单个主机配置"""
         host_uuid = scan_data.get("host_uuid")
         if not host_uuid:
-            logger.warning("主机 %s 缺少UUID，跳过", host.管理地址)
+            logger.warning(tr("deploy.payload_builder.host_missing_uuid", mgmt_ip=host.管理地址))
             return None
         
         # 获取IPv6地址（优先选择）
@@ -545,7 +546,7 @@ class DeploymentPayloadGenerator:
         for disk_data in disks_data:
             function_raw = str(disk_data.get("function", "data") or "data").lower()
             if function_raw not in allowed_functions:
-                logger.debug("忽略不支持的磁盘功能 %s: %s", function_raw, disk_data)
+                logger.debug(tr("deploy.payload_builder.ignore_disk_function", function=function_raw, disk=disk_data))
                 continue
             disk_type = str(disk_data.get("type", "HDD")).upper()
             disk = {

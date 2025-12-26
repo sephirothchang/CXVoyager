@@ -24,6 +24,7 @@ from pathlib import Path
 from cxvoyager.core.deployment.stage_manager import Stage, stage_handler
 from cxvoyager.core.deployment.runtime_context import RunContext
 from cxvoyager.core.deployment.progress import create_stage_progress_logger
+from cxvoyager.common.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -62,4 +63,4 @@ def handle_cleanup(ctx_dict):
         'summary': str(summary_path),
         'status': 'SUCCESS'
     }
-    stage_logger.info("清理完成，已生成归档", progress_extra={"bundle": str(bundle_path)})
+    stage_logger.info(tr("deploy.cleanup.done"), progress_extra={"bundle": str(bundle_path)})

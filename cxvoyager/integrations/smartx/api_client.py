@@ -104,7 +104,7 @@ class APIClient:
         # requests 会继承 session.verify，该参数支持 bool 或 CA 路径
         self.session.verify = verify
         if verify is False and not self.mock:
-            logger.warning("APIClient 已禁用 SSL 证书校验，谨慎使用")
+            logger.warning("APIClient 已禁用 SSL 证书校验")
 
     def _full_url(self, path: str) -> str:
         if path.startswith('http://') or path.startswith('https://'):
@@ -172,7 +172,7 @@ class APIClient:
                 )
             r = self.session.post(url, **request_kwargs)
             if logger.isEnabledFor(logging.DEBUG):
-                body_preview = r.text[:200] if isinstance(r.text, str) else str(r.text)
+                body_preview = r.text[:300] if isinstance(r.text, str) else str(r.text)
                 logger.debug(
                     "HTTP RESPONSE POST %s status=%s body=%s",
                     url,
@@ -183,7 +183,7 @@ class APIClient:
                 raise APIError(f"POST {url} status={r.status_code} body={r.text[:200]}")
             return r.json()
         except requests.RequestException as e:
-            logger.warning("POST失败: %s", e)
+            logger.error("POST失败: %s", e)
             raise
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=5),
@@ -215,7 +215,7 @@ class APIClient:
                 raise APIError(f"GET {url} status={r.status_code} body={r.text[:200]}")
             return r.json()
         except requests.RequestException as e:
-            logger.warning("GET失败: %s", e)
+            logger.error("GET失败: %s", e)
             raise
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=5),
@@ -247,7 +247,7 @@ class APIClient:
                 raise APIError(f"PUT {url} status={r.status_code} body={r.text[:200]}")
             return r.json() if r.content else {}
         except requests.RequestException as e:
-            logger.warning("PUT失败: %s", e)
+            logger.error("PUT失败: %s", e)
             raise
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=5),
@@ -285,6 +285,6 @@ class APIClient:
                 raise APIError(f"DELETE {url} status={r.status_code} body={r.text[:200]}")
             return r.json() if r.content else {}
         except requests.RequestException as e:
-            logger.warning("DELETE失败: %s", e)
+            logger.error("DELETE失败: %s", e)
             raise
 

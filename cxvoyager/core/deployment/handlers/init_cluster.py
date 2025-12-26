@@ -34,6 +34,7 @@ from cxvoyager.core.deployment.payload_builder import generate_deployment_payloa
 from cxvoyager.integrations.smartx.api_client import APIClient, APIError
 from cxvoyager.common.mock_scan_host import mock_scan_host
 from cxvoyager.core.deployment.progress import create_stage_progress_logger
+from cxvoyager.common.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ def handle_init_cluster(ctx_dict):
     stage_logger = create_stage_progress_logger(ctx, Stage.init_cluster.value, logger=logger, prefix="[init_cluster]")
     abort_signal = ctx_dict.get('abort_signal') or ctx.extra.get('abort_signal')
     if not ctx.plan:
-        raise RuntimeError("缺少规划数据，需先执行prepare阶段")
+        raise RuntimeError(tr("deploy.init_cluster.no_plan"))
     cfg = ctx.config or load_config(DEFAULT_CONFIG_FILE)
     api_cfg = cfg.get('api', {}) if isinstance(cfg, dict) else {}
     raw_host_scan_cfg = cfg.get('host_scan', {}) if isinstance(cfg, dict) else {}
@@ -80,7 +81,7 @@ def handle_init_cluster(ctx_dict):
     warnings: list[str] = []
 
     if use_mock:
-        stage_logger.warning("API mock 模式启用，将使用示例主机数据。")
+        stage_logger.warning(tr("deploy.init_cluster.mock_mode_enabled"))
         host_info = {}
         for idx, host in enumerate(ctx.plan.hosts):
             mgmt_ip = str(host.管理地址) if host.管理地址 else None
@@ -95,7 +96,7 @@ def handle_init_cluster(ctx_dict):
                 payload["host_ip"] = mgmt_ip
             host_key = payload.get("host_ip", base_ip)
             host_info[host_key] = payload
-        warnings.append("mock 模式使用内建示例数据，请勿用于生产部署。")
+        warnings.append(tr("deploy.init_cluster.mock_warning_text"))
     else:
         host_info, warnings = scan_hosts(
             ctx.plan,
@@ -105,15 +106,15 @@ def handle_init_cluster(ctx_dict):
             base_url=base_url,
         )
         for msg in warnings:
-            stage_logger.warning("主机扫描警告", progress_extra={"warning": msg})
+            stage_logger.warning(tr("deploy.init_cluster.host_scan_warning"), progress_extra={"warning": msg})
         if not host_info:
-            detail = "；".join(warnings) if warnings else "未获取到任何主机信息，请检查网络连接和配置后重试。"
-            raise RuntimeError(f"主机扫描失败：{detail}")
+            detail = "；".join(warnings) if warnings else tr("deploy.init_cluster.host_scan_empty_detail")
+            raise RuntimeError(tr("deploy.init_cluster.host_scan_failed", detail=detail))
 
     ctx.extra['host_scan'] = host_info
     if warnings:
         ctx.extra.setdefault('warnings', []).extend(warnings)
-    stage_logger.info("主机扫描完成", progress_extra={"hosts": list(host_info.keys())})
+    stage_logger.info(tr("deploy.init_cluster.host_scan_done"), progress_extra={"hosts": list(host_info.keys())})
 
     # 使用载荷生成器构建完整的部署载荷
     parsed_plan = None
@@ -121,12 +122,12 @@ def handle_init_cluster(ctx_dict):
         try:
             parsed_plan = parse_plan(Path(ctx.plan.source_file))
             stage_logger.info(
-                "重新解析规划表获取网络配置",
+                tr("deploy.init_cluster.reparse_plan"),
                 progress_extra={"source": ctx.plan.source_file},
             )
             ctx.extra['parsed_plan'] = parsed_plan
         except Exception as exc:  # noqa: BLE001 - 仅记录告警
-            stage_logger.warning("无法重新解析规划表", progress_extra={"error": str(exc)})
+            stage_logger.warning(tr("deploy.init_cluster.reparse_plan_fail"), progress_extra={"error": str(exc)})
 
     try:
         deploy_payload_dict, artifact_path = generate_deployment_payload(
@@ -135,13 +136,13 @@ def handle_init_cluster(ctx_dict):
             parsed_plan=parsed_plan,
         )
     except Exception as exc:  # noqa: BLE001
-        stage_logger.exception("部署载荷生成失败")
-        raise RuntimeError("生成部署载荷失败，请检查规划表和主机扫描数据。") from exc
+        stage_logger.exception(tr("deploy.init_cluster.payload_generate_fail"))
+        raise RuntimeError(tr("deploy.init_cluster.payload_generate_fail_raise")) from exc
 
     ctx.extra['deploy_payload'] = deploy_payload_dict
     ctx.extra.setdefault('artifacts', {})['deploy_payload'] = str(artifact_path)
     stage_logger.info(
-        "部署载荷构建完成",
+        tr("deploy.init_cluster.payload_done"),
         progress_extra={
             "cluster": deploy_payload_dict.get('cluster_name'),
             "host_count": len(deploy_payload_dict.get('hosts', [])),
@@ -164,7 +165,7 @@ def handle_init_cluster(ctx_dict):
 
     ctx.extra['deploy_response'] = deploy_response
     stage_logger.info(
-        "部署接口调用完成",
+        tr("deploy.init_cluster.api_done"),
         progress_extra={"response_preview": json.dumps(deploy_response, ensure_ascii=False)[:400]},
     )
 
@@ -195,7 +196,7 @@ def handle_init_cluster(ctx_dict):
     )
     ctx.extra['deploy_verify'] = verify_response
     stage_logger.info(
-        "部署状态校验完成",
+        tr("deploy.init_cluster.verify_done"),
         progress_extra={"is_deployed": verify_response.get("data", {}).get("is_deployed")},
     )
 
@@ -220,17 +221,17 @@ def _trigger_cluster_deployment(
         headers["x-smartx-token"] = token
 
     stage_logger.info(
-        "调用部署接口",
+        tr("deploy.init_cluster.api_call"),
         progress_extra={"base_url": base_url.rstrip('/'), "path": "/api/v2/deployment/cluster"},
     )
     try:
         response = client.post("/api/v2/deployment/cluster", payload=payload, headers=headers)
     except APIError as exc:
-        stage_logger.exception("部署接口返回错误", progress_extra={"error": str(exc)})
-        raise RuntimeError(f"部署接口返回错误: {exc}") from exc
+        stage_logger.exception(tr("deploy.init_cluster.api_error_response"), progress_extra={"error": str(exc)})
+        raise RuntimeError(tr("deploy.init_cluster.api_error_response_raise", error=exc)) from exc
     except Exception as exc:  # noqa: BLE001 - 网络等异常
-        stage_logger.exception("调用部署接口失败", progress_extra={"error": str(exc)})
-        raise RuntimeError(f"调用部署接口失败: {exc}") from exc
+        stage_logger.exception(tr("deploy.init_cluster.api_call_fail"), progress_extra={"error": str(exc)})
+        raise RuntimeError(tr("deploy.init_cluster.api_call_fail_raise", error=exc)) from exc
 
     normalized = _normalize_deploy_response(response, use_mock)
     if _is_deploy_success(normalized):
@@ -238,7 +239,7 @@ def _trigger_cluster_deployment(
 
     # 其它返回均视为失败，保留原始响应以便展示
     detail = json.dumps(response, ensure_ascii=False, indent=2) if isinstance(response, dict) else str(response)
-    raise RuntimeError(f"部署接口返回错误: {detail}")
+    raise RuntimeError(tr("deploy.init_cluster.api_return_error", detail=detail))
 
 
 def _wait_for_deployment_completion(
@@ -259,7 +260,7 @@ def _wait_for_deployment_completion(
     raise_if_aborted(ctx_view, abort_signal=abort_signal, stage_logger=stage_logger, hint="准备轮询部署进展")
 
     if use_mock:
-        stage_logger.info("mock 模式下跳过部署状态轮询，直接视为成功。")
+        stage_logger.info(tr("deploy.init_cluster.skip_poll_mock"))
         return {"data": {"is_deployed": True, "platform": "mock"}, "ec": "EOK", "error": {}}
 
     base_url, host_header = _resolve_deployment_base(base_url_override, host_info)
@@ -276,7 +277,7 @@ def _wait_for_deployment_completion(
 
     if INITIAL_PROGRESS_DELAY > 0:
         raise_if_aborted(ctx_view, abort_signal=abort_signal, stage_logger=stage_logger, hint="等待首次进度轮询")
-        message = f"部署任务已提交，等待 {INITIAL_PROGRESS_DELAY} 秒后开始查询主机进度"
+        message = tr("deploy.init_cluster.wait_first_poll", delay=INITIAL_PROGRESS_DELAY)
         stage_logger.info(message)
         time.sleep(INITIAL_PROGRESS_DELAY)
         raise_if_aborted(ctx_view, abort_signal=abort_signal, stage_logger=stage_logger, hint="首次进度轮询前")
@@ -293,19 +294,15 @@ def _wait_for_deployment_completion(
         except APIError as exc:
             last_progress = {"error": str(exc)}
             if attempt < max_attempts:
-                message = (
-                    f"部署进度查询失败({attempt}/{max_attempts}): {exc}，将在 {poll_interval} 秒后重试"
-                )
+                message = tr("deploy.init_cluster.progress_query_fail_retry", attempt=attempt, max_attempts=max_attempts, error=exc, poll_interval=poll_interval)
                 stage_logger.warning(
-                    "部署进度查询失败，稍后重试",
+                    tr("deploy.init_cluster.progress_query_fail_retry_log"),
                     progress_extra={"attempt": attempt, "max_attempts": max_attempts, "error": str(exc)},
                 )
             else:
-                message = (
-                    f"部署进度查询失败({attempt}/{max_attempts}): {exc}，已达到最大重试次数"
-                )
+                message = tr("deploy.init_cluster.progress_query_fail_max", attempt=attempt, max_attempts=max_attempts, error=exc)
                 stage_logger.error(
-                    "部署进度查询失败，已达到最大重试次数",
+                    tr("deploy.init_cluster.progress_query_fail_max_log"),
                     progress_extra={"attempt": attempt, "max_attempts": max_attempts, "error": str(exc)},
                 )
                 progress_completed = True
@@ -313,19 +310,15 @@ def _wait_for_deployment_completion(
         except Exception as exc:  # noqa: BLE001
             last_progress = {"exception": str(exc)}
             if attempt < max_attempts:
-                message = (
-                    f"部署进度查询异常({attempt}/{max_attempts}): {exc}，将在 {poll_interval} 秒后重试"
-                )
+                message = tr("deploy.init_cluster.progress_query_exc_retry", attempt=attempt, max_attempts=max_attempts, error=exc, poll_interval=poll_interval)
                 stage_logger.warning(
-                    "部署进度查询异常，稍后重试",
+                    tr("deploy.init_cluster.progress_query_exc_retry_log"),
                     progress_extra={"attempt": attempt, "max_attempts": max_attempts, "error": str(exc)},
                 )
             else:
-                message = (
-                    f"部署进度查询异常({attempt}/{max_attempts}): {exc}，已达到最大重试次数"
-                )
+                message = tr("deploy.init_cluster.progress_query_exc_max", attempt=attempt, max_attempts=max_attempts, error=exc)
                 stage_logger.error(
-                    "部署进度查询异常，已达到最大重试次数",
+                    tr("deploy.init_cluster.progress_query_exc_max_log"),
                     progress_extra={"attempt": attempt, "max_attempts": max_attempts, "error": str(exc)},
                 )
                 progress_completed = True
@@ -342,11 +335,9 @@ def _wait_for_deployment_completion(
 
             if has_error:
                 info_detail = json.dumps(progress.get("error"), ensure_ascii=False)[:400]
-                message = (
-                    f"初始化结束({attempt}/{max_attempts}): state={state}, response={info_detail}"
-                )
+                message = tr("deploy.init_cluster.progress_end", attempt=attempt, max_attempts=max_attempts, state=state, info_detail=info_detail)
                 stage_logger.info(
-                    "部署进度返回结束",
+                    tr("deploy.init_cluster.progress_end_log"),
                     progress_extra={
                         "attempt": attempt,
                         "max_attempts": max_attempts,
@@ -359,19 +350,15 @@ def _wait_for_deployment_completion(
                 should_wait = False
             elif state is None:
                 snapshot = json.dumps(progress, ensure_ascii=False)[:400]
-                message = (
-                    f"部署进度响应缺少 state 字段({attempt}/{max_attempts})，将继续等待: {snapshot}"
-                )
+                message = tr("deploy.init_cluster.progress_missing_state", attempt=attempt, max_attempts=max_attempts, snapshot=snapshot)
                 stage_logger.info(
-                    "部署进度缺少 state 字段，继续等待",
+                    tr("deploy.init_cluster.progress_missing_state_log"),
                     progress_extra={"attempt": attempt, "max_attempts": max_attempts},
                 )
             elif "running" in state:
-                message = (
-                    f"部署进度轮询({attempt}/{max_attempts}): state={state}, stage={stage_info}"
-                )
+                message = tr("deploy.init_cluster.progress_running", attempt=attempt, max_attempts=max_attempts, state=state, stage=stage_info)
                 stage_logger.info(
-                    "部署进度轮询",
+                    tr("deploy.init_cluster.progress_running_log"),
                     progress_extra={
                         "attempt": attempt,
                         "max_attempts": max_attempts,
@@ -380,11 +367,9 @@ def _wait_for_deployment_completion(
                     },
                 )
             else:
-                message = (
-                    f"部署进度阶段已结束({attempt}/{max_attempts}): state={state}, stage={stage_info}"
-                )
+                message = tr("deploy.init_cluster.progress_stage_end", attempt=attempt, max_attempts=max_attempts, state=state, stage=stage_info)
                 stage_logger.info(
-                    "部署进度阶段已结束",
+                    tr("deploy.init_cluster.progress_stage_end_log"),
                     progress_extra={
                         "attempt": attempt,
                         "max_attempts": max_attempts,
@@ -401,15 +386,15 @@ def _wait_for_deployment_completion(
         if attempt < max_attempts and should_wait:
             raise_if_aborted(ctx_view, abort_signal=abort_signal, stage_logger=stage_logger, hint="等待下一次进度轮询")
             stage_logger.info(
-                "部署进度仍在进行，将在稍后重试",
+                tr("deploy.init_cluster.progress_retry_wait"),
                 progress_extra={"poll_interval": poll_interval, "attempt": attempt, "max_attempts": max_attempts},
             )
             time.sleep(poll_interval)
             raise_if_aborted(ctx_view, abort_signal=abort_signal, stage_logger=stage_logger, hint="进度轮询等待期间")
 
     if not progress_completed:
-        detail = json.dumps(last_progress, ensure_ascii=False, indent=2) if last_progress else "无有效响应"
-        raise RuntimeError(f"部署进度仍处于运行状态，超出最大轮询次数: {detail}")
+        detail = json.dumps(last_progress, ensure_ascii=False, indent=2) if last_progress else tr("deploy.init_cluster.progress_no_response")
+        raise RuntimeError(tr("deploy.init_cluster.progress_timeout", detail=detail))
 
     last_response: Dict[str, Any] | None = None
     for attempt in range(1, VERIFY_MAX_ATTEMPTS + 1):
@@ -417,16 +402,16 @@ def _wait_for_deployment_completion(
         try:
             response = client.get("/api/v2/deployment/deploy_verify", headers=headers)
         except APIError as exc:
-            message = f"校验部署状态失败({attempt}/{VERIFY_MAX_ATTEMPTS}): {exc}"
+            message = tr("deploy.init_cluster.verify_fail_retry", attempt=attempt, max_attempts=VERIFY_MAX_ATTEMPTS, error=exc)
             stage_logger.warning(
-                "部署状态校验失败，稍后重试",
+                tr("deploy.init_cluster.verify_fail_retry_log"),
                 progress_extra={"attempt": attempt, "max_attempts": VERIFY_MAX_ATTEMPTS, "error": str(exc)},
             )
             last_response = {"error": str(exc)}
         except Exception as exc:  # noqa: BLE001 - 记录并继续轮询
-            message = f"校验部署状态异常({attempt}/{VERIFY_MAX_ATTEMPTS}): {exc}"
+            message = tr("deploy.init_cluster.verify_exc_retry", attempt=attempt, max_attempts=VERIFY_MAX_ATTEMPTS, error=exc)
             stage_logger.warning(
-                "部署状态校验异常，稍后重试",
+                tr("deploy.init_cluster.verify_exc_retry_log"),
                 progress_extra={"attempt": attempt, "max_attempts": VERIFY_MAX_ATTEMPTS, "error": str(exc)},
             )
             last_response = {"exception": str(exc)}
@@ -434,29 +419,29 @@ def _wait_for_deployment_completion(
             normalized = _normalize_deploy_verify_response(response, use_mock)
             last_response = normalized
             status = _extract_is_deployed(normalized)
-            message = f"部署状态轮询({attempt}/{VERIFY_MAX_ATTEMPTS}): is_deployed={status}"
+            message = tr("deploy.init_cluster.verify_poll", attempt=attempt, max_attempts=VERIFY_MAX_ATTEMPTS, status=status)
             stage_logger.debug(
-                "部署状态轮询",
+                tr("deploy.init_cluster.verify_poll_log"),
                 progress_extra={"attempt": attempt, "max_attempts": VERIFY_MAX_ATTEMPTS, "is_deployed": status},
             )
             if status is True:
-                stage_logger.info("部署验证通过，集群已成功部署")
+                stage_logger.info(tr("deploy.init_cluster.verify_pass"))
                 return normalized
             if status is False and _response_has_error(normalized):
                 detail = json.dumps(normalized, ensure_ascii=False, indent=2)
-                stage_logger.error("部署验证失败", progress_extra={"detail": detail})
-                raise RuntimeError(f"部署验证失败: {detail}")
+                stage_logger.error(tr("deploy.init_cluster.verify_error"), progress_extra={"detail": detail})
+                raise RuntimeError(tr("deploy.init_cluster.verify_error_raise", detail=detail))
 
         if attempt < VERIFY_MAX_ATTEMPTS:
             stage_logger.info(
-                "部署验证未完成，将在稍后重试",
+                tr("deploy.init_cluster.verify_retry_wait"),
                 progress_extra={"poll_interval": VERIFY_POLL_INTERVAL, "attempt": attempt},
             )
             time.sleep(VERIFY_POLL_INTERVAL)
 
-    detail = json.dumps(last_response, ensure_ascii=False, indent=2) if last_response else "无有效响应"
-    stage_logger.error("部署状态未在预期时间内成功", progress_extra={"detail": detail})
-    raise RuntimeError(f"部署状态未在预期时间内成功: {detail}")
+    detail = json.dumps(last_response, ensure_ascii=False, indent=2) if last_response else tr("deploy.init_cluster.verify_no_response")
+    stage_logger.error(tr("deploy.init_cluster.verify_timeout"), progress_extra={"detail": detail})
+    raise RuntimeError(tr("deploy.init_cluster.verify_timeout_raise", detail=detail))
 
 
 def _normalize_deploy_verify_response(response: Any, use_mock: bool) -> Dict[str, Any]:

@@ -26,6 +26,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, cast
 from cxvoyager.common.config import load_config
 from cxvoyager.common.network_utils import check_port
 from cxvoyager.common.system_constants import DEFAULT_CONFIG_FILE
+from cxvoyager.common.i18n import tr
 from cxvoyager.core.deployment.progress import create_stage_progress_logger
 from cxvoyager.core.deployment.runtime_context import RunContext
 from cxvoyager.core.deployment.stage_manager import Stage, stage_handler
@@ -181,11 +182,11 @@ def _ensure_plan_for_config(ctx: RunContext, stage_logger: logging.LoggerAdapter
                         ctx.plan = plan_model
                         if isinstance(ctx.extra, dict):
                                 ctx.extra['parsed_plan'] = parsed_plan
-                        stage_logger.info("已自动加载规划表", progress_extra={"plan_path": str(plan_path)})
+                        stage_logger.info(tr("deploy.cloudtower_config.plan_auto_loaded"), progress_extra={"plan_path": str(plan_path)})
                 else:
-                        stage_logger.warning("未找到规划表，将继续尝试配置项", progress_extra={"base_dir": str(base_dir) if base_dir else ""})
+                        stage_logger.warning(tr("deploy.cloudtower_config.plan_not_found"), progress_extra={"base_dir": str(base_dir) if base_dir else ""})
         except Exception as exc:  # noqa: BLE001
-                stage_logger.warning("自动加载规划表失败，将继续尝试配置项", progress_extra={"error": str(exc)})
+                    stage_logger.warning(tr("deploy.cloudtower_config.plan_load_failed", error=exc), progress_extra={"error": str(exc)})
 
         return plan_model, parsed_plan
 
@@ -222,14 +223,14 @@ def handle_cloudtower_config(ctx_dict: Dict[str, Any]) -> None:
 
     deploy_info = ctx.extra.get('deploy_cloudtower') or {}
     if deploy_info.get('status') != 'SERVICE_READY':
-        stage_logger.info("未发现阶段 04/05 输出，尝试直接探测 CloudTower 服务")
+        stage_logger.info(tr("deploy.cloudtower_config.probe_no_stage4"))
         cloud_cfg = cfg_dict.get('cloudtower', {}) if isinstance(cfg_dict, dict) else {}
         cloudtower_ip = _resolve_cloudtower_ip(plan_model, parsed_plan, cloud_cfg, stage_logger)
         if not cloudtower_ip:
             raise RuntimeError("缺少 CloudTower IP，无法执行探测与配置。")
 
         stage_logger.info(
-            "检测 CloudTower 443 端口连通性",
+            tr("deploy.cloudtower_config.probe_port"),
             progress_extra={"ip": cloudtower_ip, "port": 443},
         )
         if not check_port(cloudtower_ip, 443, timeout=5.0):
@@ -252,7 +253,7 @@ def handle_cloudtower_config(ctx_dict: Dict[str, Any]) -> None:
             },
         }
         ctx.extra['deploy_cloudtower'] = deploy_info
-        stage_logger.info("CloudTower 已就绪，使用探测结果继续配置", progress_extra={"ip": cloudtower_ip})
+        stage_logger.info(tr("deploy.cloudtower_config.probe_ready"), progress_extra={"ip": cloudtower_ip})
 
     attach_info = ctx.extra.get('attach_cluster') or {}
     cloudtower_ip = deploy_info.get('ip')
@@ -272,7 +273,7 @@ def handle_cloudtower_config(ctx_dict: Dict[str, Any]) -> None:
     if token:
         client.session.headers['Authorization'] = token
     else:
-        stage_logger.warning("未发现 CloudTower token，尝试重新登录后继续。")
+        stage_logger.warning(tr("deploy.cloudtower_config.token_missing_retry"))
         token = _cloudtower_login(client=client, ip=cloudtower_ip, stage_logger=stage_logger)
         client.session.headers['Authorization'] = token
 
@@ -295,7 +296,7 @@ def handle_cloudtower_config(ctx_dict: Dict[str, Any]) -> None:
         raise RuntimeError("未获取到集群设置 ID，无法更新默认存储策略。")
 
     stage_logger.info(
-        "阶段 06：开始执行 CloudTower 集群配置",
+        tr("deploy.cloudtower_config.start"),
         progress_extra={
             "cloudtower_ip": cloudtower_ip,
             "cluster_id": cluster_id,
@@ -341,7 +342,7 @@ def handle_cloudtower_config(ctx_dict: Dict[str, Any]) -> None:
     }
 
     stage_logger.info(
-        "阶段 06 配置完成",
+        tr("deploy.cloudtower_config.done"),
         progress_extra={
             "cluster_id": cluster_id,
             "operation_count": len(results['operations']),
@@ -401,7 +402,7 @@ def _ensure_cluster_info(
                     "host_num": int(host_num),
                 }
 
-    stage_logger.info("未从阶段 05 缓存获取完整集群信息，正在查询 CloudTower 当前状态。")
+    stage_logger.info(tr("deploy.cloudtower_config.cluster_info_cache_miss"))
     response = client.post(CLOUDTOWER_GET_CLUSTERS_ENDPOINT, payload={}, headers=headers)
     clusters = _extract_cluster_list(response)
     if not clusters:
@@ -515,7 +516,7 @@ def _update_default_storage_policy(
         client=client,
         payload=payload,
         stage_logger=stage_logger,
-        description="更新默认存储策略",
+        description=tr("deploy.cloudtower_config.action_update_storage_policy"),
         ignore_messages=(),
     )
 
@@ -523,7 +524,7 @@ def _update_default_storage_policy(
     if not isinstance(updated, dict):
         updated = {}
     stage_logger.info(
-        "已更新集群默认存储策略",
+        tr("deploy.cloudtower_config.storage_policy_updated"),
         progress_extra={
             "settings_id": settings_id,
             "policy": updated.get('default_storage_policy', cfg.storage_policy),
@@ -551,13 +552,13 @@ def _update_cluster_capacity_alert(
     """计算容量告警阈值并尝试写回 CloudTower。"""
 
     if host_count <= 0:
-        stage_logger.warning("缺少主机数量，无法计算告警阈值，已跳过。")
+        stage_logger.warning(tr("deploy.cloudtower_config.alert_host_missing"))
         return {"type": "alert_threshold", "skipped": True, "reason": "host_count_missing"}
 
     ratio = ((host_count - 1) / host_count) - 0.05
     notice_value = max(cfg.alert_notice_floor, min(cfg.alert_critical - 1, math.floor(max(ratio, 0.1) * 100)))
     stage_logger.info(
-        "计算容量告警阈值",
+        tr("deploy.cloudtower_config.alert_compute_threshold"),
         progress_extra={
             "host_count": host_count,
             "notice_threshold": notice_value,
@@ -588,7 +589,7 @@ def _update_cluster_capacity_alert(
         break
 
     if not target_rule or not target_alert:
-        stage_logger.warning("未找到匹配的告警规则或集群分支，已跳过更新。")
+        stage_logger.warning(tr("deploy.cloudtower_config.alert_rule_missing"))
         return {
             "type": "alert_threshold",
             "skipped": True,
@@ -598,7 +599,7 @@ def _update_cluster_capacity_alert(
 
     alert_id = target_alert.get('id')
     if not alert_id:
-        stage_logger.warning("目标告警规则缺少 ID，无法更新。")
+        stage_logger.warning(tr("deploy.cloudtower_config.alert_id_missing"))
         return {
             "type": "alert_threshold",
             "skipped": True,
@@ -622,7 +623,7 @@ def _update_cluster_capacity_alert(
     ]
 
     stage_logger.info(
-        "准备更新容量告警阈值",
+        tr("deploy.cloudtower_config.alert_prepare_update"),
         progress_extra={
             "global_rule_id": target_rule.get('id') if isinstance(target_rule, dict) else None,
             "alert_rule_id": alert_id,
@@ -659,10 +660,10 @@ def _update_cluster_capacity_alert(
     result = (response or {}).get('data', {}).get('updateGlobalAlertRule') if isinstance(response, dict) else None
 
     if not result:
-        stage_logger.warning("更新告警阈值接口未返回成功结果，请人工确认 CloudTower 中的阈值。")
+        stage_logger.warning(tr("deploy.cloudtower_config.alert_update_warn"))
     else:
         stage_logger.info(
-            "已更新容量告警阈值",
+            tr("deploy.cloudtower_config.alert_update_done"),
             progress_extra={
                 "alert_rule_id": alert_id,
                 "notice": notice_value,
@@ -702,7 +703,7 @@ def _setup_monitoring_dashboards(
         )
         views[name] = view_id
         stage_logger.info(
-            "监控视图准备完成",
+            tr("deploy.cloudtower_config.views_ready"),
             progress_extra={"view_name": name, "view_id": view_id, "created": created},
         )
 
@@ -745,7 +746,7 @@ def _setup_monitoring_dashboards(
         graph_batches.append({"view": "VM", "created": count})
 
     stage_logger.info(
-        "监控面板创建完成",
+        tr("deploy.cloudtower_config.dashboards_done"),
         progress_extra={"views": views, "graph_batches": graph_batches},
     )
 
@@ -824,7 +825,7 @@ def _fetch_host_ids(
             host_ids.append(str(item['id']))
 
     stage_logger.info(
-        "获取主机列表完成",
+        tr("deploy.cloudtower_config.host_list_done"),
         progress_extra={"host_count": len(host_ids)},
     )
 
@@ -869,7 +870,7 @@ def _create_cluster_graphs(
         },
     ]
     client.post("/v2/api/create-graph", payload=cast(Dict[str, Any], graphs), headers=headers)
-    stage_logger.info("已创建集群视图图表", progress_extra={"view_id": view_id, "count": len(graphs)})
+    stage_logger.info(tr("deploy.cloudtower_config.cluster_graphs_created"), progress_extra={"view_id": view_id, "count": len(graphs)})
     return len(graphs)
 
 
@@ -883,7 +884,7 @@ def _create_host_graphs(
     stage_logger: logging.LoggerAdapter,
 ) -> int:
     if not host_ids:
-        stage_logger.warning("未找到主机，跳过主机视图图表创建。")
+        stage_logger.warning(tr("deploy.cloudtower_config.host_graphs_skip_no_host"))
         return 0
 
     graphs = [
@@ -954,7 +955,7 @@ def _create_host_graphs(
 
     client.post("/v2/api/create-graph", payload=cast(Dict[str, Any], graphs), headers=headers)
     stage_logger.info(
-        "已创建主机视图图表",
+        tr("deploy.cloudtower_config.host_graphs_created"),
         progress_extra={"view_id": view_id, "count": len(graphs), "host_count": len(host_ids)},
     )
     return len(graphs)
@@ -1027,6 +1028,6 @@ def _create_vm_graphs(
     ]
 
     client.post("/v2/api/create-graph", payload=cast(Dict[str, Any], graphs), headers=headers)
-    stage_logger.info("已创建虚拟机视图图表", progress_extra={"view_id": view_id, "count": len(graphs)})
+    stage_logger.info(tr("deploy.cloudtower_config.vm_graphs_created"), progress_extra={"view_id": view_id, "count": len(graphs)})
     return len(graphs)
 

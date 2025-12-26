@@ -18,6 +18,7 @@ from cxvoyager.core.deployment.stage_manager import Stage, stage_handler
 from cxvoyager.core.deployment.login_cloudtower import login_cloudtower
 from cxvoyager.core.deployment.query_cluster import query_cluster_by_name
 from cxvoyager.core.deployment.query_vnet import query_vnet_by_name
+from cxvoyager.common.i18n import tr
 from cxvoyager.integrations.smartx.api_client import APIClient
 
 from .app_upload import (
@@ -26,6 +27,7 @@ from .app_upload import (
     _ensure_plan_loaded,
     _resolve_cloudtower_base_url,
     _resolve_cloudtower_token,
+    _reset_plan_context,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,11 +38,12 @@ OBS_COMMIT_ENDPOINT = "/api/ovm-operator/api/v3/chunkedUploads/{upload_id}:commi
 OBS_TASKS_ENDPOINT = "/v2/api/get-tasks"
 DEFAULT_OBS_BASIC_AUTH = "Basic bzExeTpIQyFyMGNrcw=="  # o11y:HC!r0cks
 DEFAULT_CHUNK_SIZE = 4 * 1024 * 1024  # 4MiB
-DEFAULT_TASK_WAIT_TIMEOUT = 600  # seconds
+DEFAULT_TASK_WAIT_TIMEOUT = 900  # seconds
 DEFAULT_TASK_POLL_INTERVAL = 5  # seconds
 DEFAULT_INSTANCE_WAIT_TIMEOUT = 1800  # seconds
 DEFAULT_INSTANCE_POLL_INTERVAL = 10  # seconds
 DEFAULT_OBS_NAME = "observability"
+STEP_DELAY_SECONDS = 30
 OBS_PACKAGE_PATTERN = "Observability-*-v*.tar.gz"
 OBS_NAME_REGEX = re.compile(
     r"Observability-(?P<arch>X86_64|AARCH64)-v(?P<version>[\d\.]+)(?:-release\.(?P<date>\d+)(?:-(?P<build>\d+))?)?\.tar\.gz",
@@ -69,6 +72,15 @@ OBS_ASSOCIATE_SYSTEM_SERVICE_MUTATION = (
     "    connected_system_services {\n"
     "      id\n      type\n      status\n      system_service { id name version __typename }\n      instances { state __typename }\n      __typename\n    }\n"
     "    __typename\n  }\n}\n"
+)
+
+OBS_UPDATE_NTP_MUTATION = (
+    "mutation updateObservabilityNtpUrl($data: NtpCommonUpdateInput!, $where: BundleApplicationInstanceWhereUniqueInput!) {\n"
+    "  updateObservabilityNtpUrl(data: $data, where: $where) {\n"
+    "    ntp_service_url\n"
+    "    __typename\n"
+    "  }\n"
+    "}\n"
 )
 
 
@@ -106,18 +118,38 @@ def _build_obs_headers(api_cfg, *, cookie: str | None = None) -> dict:
     return headers
 
 
+def _delay_between_steps(stage_logger, label: str | None = None) -> None:
+    stage_logger.info(
+        "[deploy_obs] step delay",
+        progress_extra={"seconds": STEP_DELAY_SECONDS, "label": label} if label else {"seconds": STEP_DELAY_SECONDS},
+    )
+    time.sleep(STEP_DELAY_SECONDS)
+
+
+def _normalize_server_list(raw) -> list[str]:
+    if raw is None:
+        return []
+    if isinstance(raw, (list, tuple, set)):
+        values = list(raw)
+    elif isinstance(raw, str):
+        values = [item.strip() for item in raw.replace(";", ",").split(",")]
+    else:
+        values = [str(raw).strip()]
+    return [item for item in values if item]
+
+
 def _init_upload(client: APIClient, package_name: str, headers: dict, stage_logger) -> str:
     try:
         resp = client.post(OBS_INIT_ENDPOINT, {"origin_file_name": package_name}, headers=headers)
     except Exception as exc:  # pragma: no cover - surfaced
-        stage_logger.error("OBS 上传初始化失败", progress_extra={"error": str(exc)})
+        stage_logger.error(tr("deploy.deploy_obs.init_fail"), progress_extra={"error": str(exc)})
         raise RuntimeError(f"OBS 上传初始化失败: {exc}")
 
     upload_id = resp.get("id")
     if not upload_id:
         raise RuntimeError("OBS 上传初始化响应缺少上传ID")
 
-    stage_logger.info("OBS 上传任务已创建", progress_extra={"upload_id": upload_id, "status": resp.get("status")})
+    stage_logger.info(tr("deploy.deploy_obs.upload_created"), progress_extra={"upload_id": upload_id, "status": resp.get("status")})
     return upload_id
 
 
@@ -137,7 +169,7 @@ def _upload_chunks(client: APIClient, upload_id: str, package_path: Path, header
                 resp = client.post(OBS_CHUNK_ENDPOINT, headers=headers, files=files, data=form)
             except Exception as exc:  # pragma: no cover - surfaced
                 stage_logger.error(
-                    "OBS 分片上传失败",
+                    tr("deploy.deploy_obs.chunk_fail"),
                     progress_extra={"chunk": chunk_index, "sent_bytes": sent, "error": str(exc)},
                 )
                 raise RuntimeError(f"OBS 分片上传失败: {exc}")
@@ -145,7 +177,7 @@ def _upload_chunks(client: APIClient, upload_id: str, package_path: Path, header
             sent += len(data)
             progress = round(sent / file_size * 100, 2) if file_size else 100
             stage_logger.info(
-                "OBS 分片上传完成",
+                tr("deploy.deploy_obs.chunk_done"),
                 progress_extra={
                     "chunk": chunk_index,
                     "uploaded": sent,
@@ -162,10 +194,10 @@ def _commit_upload(client: APIClient, upload_id: str, headers: dict, stage_logge
     try:
         resp = client.post(path, headers=headers)
     except Exception as exc:  # pragma: no cover - surfaced
-        stage_logger.error("OBS 上传提交失败", progress_extra={"upload_id": upload_id, "error": str(exc)})
+        stage_logger.error(tr("deploy.deploy_obs.commit_fail"), progress_extra={"upload_id": upload_id, "error": str(exc)})
         raise RuntimeError(f"OBS 上传提交失败: {exc}")
 
-    stage_logger.info("OBS 上传已提交", progress_extra={"upload_id": upload_id, "status": resp.get("status")})
+    stage_logger.info(tr("deploy.deploy_obs.commit_done"), progress_extra={"upload_id": upload_id, "status": resp.get("status")})
     return resp
 
 
@@ -196,7 +228,7 @@ def _verify_obs_pak_instance(
     try:
         resp = client.post("/api", payload, headers=verify_headers)
     except Exception as exc:  # pragma: no cover - surfaced
-        stage_logger.error("OBS 校验接口调用失败", progress_extra={"error": str(exc)})
+        stage_logger.error(tr("deploy.deploy_obs.verify_fail"), progress_extra={"error": str(exc)})
         raise RuntimeError(f"OBS 校验接口调用失败: {exc}")
 
     data = resp.get("data") if isinstance(resp, dict) else None
@@ -212,7 +244,7 @@ def _verify_obs_pak_instance(
 
     if log_info:
         stage_logger.info(
-            "OBS 安装包校验完成",
+            tr("deploy.deploy_obs.verify_done"),
             progress_extra={"found": found, "version": version},
         )
     resp["verified"] = found
@@ -334,12 +366,22 @@ def _associate_obs_instance(
     }
 
     stage_logger.info(
-        "关联 OBS 实例到集群",
+        tr("deploy.deploy_obs.associate_cluster"),
         progress_extra={"instance_id": instance_id, "cluster_id": cluster_id, "base_url": base_url.rstrip("/")},
     )
     resp = client.post("/api", payload, headers=headers)
+    if isinstance(resp, dict) and resp.get("errors"):
+        stage_logger.error(
+            tr("deploy.deploy_obs.associate_cluster_fail"),
+            progress_extra={"instance_id": instance_id, "cluster_id": cluster_id, "errors": resp.get("errors")},
+        )
+    else:
+        stage_logger.info(
+            tr("deploy.deploy_obs.associate_cluster_done"),
+            progress_extra={"instance_id": instance_id, "cluster_id": cluster_id},
+        )
     stage_logger.debug(
-        "OBS 关联响应",
+        tr("deploy.deploy_obs.associate_cluster_debug"),
         progress_extra={"keys": sorted(resp.keys()) if isinstance(resp, dict) else type(resp).__name__},
     )
     return resp
@@ -805,12 +847,12 @@ def _associate_obs_system_service(
     }
 
     stage_logger.info(
-        "关联 OBS 系统服务",
+        tr("deploy.deploy_obs.associate_system_service"),
         progress_extra={"ovm_name": obs_name, "url": service_url},
     )
     resp = client.post("/api", payload, headers=headers)
     stage_logger.debug(
-        "OBS 系统服务关联响应",
+        tr("deploy.deploy_obs.associate_system_service_debug"),
         progress_extra={"keys": sorted(resp.keys()) if isinstance(resp, dict) else type(resp).__name__},
     )
     return resp
@@ -852,12 +894,12 @@ def _create_obs_instance(
     }
 
     stage_logger.info(
-        "创建 OBS 实例",
+        tr("deploy.deploy_obs.create_instance"),
         progress_extra={"name": name, "cluster_id": cluster_id, "package_id": package_id},
     )
     resp = client.post("/api", payload, headers=headers)
     stage_logger.debug(
-        "OBS 创建响应",
+        tr("deploy.deploy_obs.create_instance_debug"),
         progress_extra={"keys": sorted(resp.keys()) if isinstance(resp, dict) else type(resp).__name__},
     )
     return resp
@@ -872,7 +914,7 @@ def _wait_obs_tasks(
     package_name: str,
 ) -> dict | None:
     if not token:
-        stage_logger.warning("缺少 CloudTower token，跳过 get-tasks 轮询")
+        stage_logger.warning(tr("deploy.deploy_obs.tasks_no_token"))
         return None
 
     timeout = int(api_cfg.get("obs_task_wait_timeout", DEFAULT_TASK_WAIT_TIMEOUT)) if isinstance(api_cfg, dict) else DEFAULT_TASK_WAIT_TIMEOUT
@@ -886,7 +928,7 @@ def _wait_obs_tasks(
     last_resp: dict | None = None
 
     stage_logger.info(
-        "轮询 OBS 安装包处理任务状态",
+        tr("deploy.deploy_obs.tasks_polling"),
         progress_extra={"timeout_s": timeout, "interval_s": interval, "package": package_name},
     )
 
@@ -894,7 +936,7 @@ def _wait_obs_tasks(
         try:
             resp = client.post(OBS_TASKS_ENDPOINT, payload={}, headers=headers)
         except Exception as exc:  # pragma: no cover - surfaced
-            stage_logger.warning("查询 get-tasks 失败（忽略并重试）", progress_extra={"error": str(exc)})
+            stage_logger.warning(tr("deploy.deploy_obs.tasks_query_fail_retry"), progress_extra={"error": str(exc)})
             time.sleep(interval)
             continue
 
@@ -907,7 +949,7 @@ def _wait_obs_tasks(
             all_done = all(str(t.get("status") or "").upper() == "SUCCESSED" for t in matched)
             if all_done:
                 stage_logger.info(
-                    "OBS 处理任务已完成",
+                    tr("deploy.deploy_obs.tasks_done"),
                     progress_extra={"tasks": [t.get("id") for t in matched]},
                 )
                 return {"tasks": matched}
@@ -917,7 +959,7 @@ def _wait_obs_tasks(
 
         time.sleep(interval)
 
-    stage_logger.warning("OBS 处理任务未在超时时间内完成", progress_extra={"timeout_s": timeout})
+    stage_logger.warning(tr("deploy.deploy_obs.tasks_timeout"), progress_extra={"timeout_s": timeout})
     return last_resp
 
 
@@ -969,6 +1011,70 @@ def _resolve_obs_vm_spec(ctx: RunContext, deploy_cfg: dict) -> tuple[dict | None
     return vm_spec, name
 
 
+def _resolve_ntp_servers(ctx: RunContext, api_cfg: dict, deploy_cfg: dict) -> list[str]:
+    plan = getattr(ctx, "plan", None)
+    mgmt = getattr(plan, "mgmt", None)
+
+    candidates = None
+    for attr in ("NTP服务器", "NTP 服务器", "ntp_servers"):
+        if mgmt and getattr(mgmt, attr, None):
+            candidates = getattr(mgmt, attr)
+            break
+
+    if candidates is None and isinstance(deploy_cfg, dict):
+        candidates = deploy_cfg.get("ntp_servers")
+
+    if candidates is None and isinstance(api_cfg, dict):
+        candidates = api_cfg.get("ntp_servers")
+
+    if candidates is None and isinstance(ctx.extra, dict):
+        candidates = ctx.extra.get("ntp_servers")
+
+    return _normalize_server_list(candidates)
+
+
+def _update_obs_ntp(
+    *,
+    base_url: str,
+    cookie: str,
+    token: str | None,
+    instance_id: str,
+    servers: list[str],
+    stage_logger,
+    api_cfg,
+) -> dict:
+    timeout = int(api_cfg.get("timeout", 10)) if isinstance(api_cfg, dict) else 10
+    verify_ssl = api_cfg.get("verify_ssl", False) if isinstance(api_cfg, dict) else False
+    client = APIClient(base_url=base_url, mock=False, timeout=timeout, verify=verify_ssl)
+
+    headers = {"cookie": cookie}
+    if token:
+        headers["Authorization"] = token
+
+    joined = ",".join(servers)
+    payload = {
+        "operationName": "updateObservabilityNtpUrl",
+        "variables": {"data": {"ntp_service_url": joined}, "where": {"id": instance_id}},
+        "query": OBS_UPDATE_NTP_MUTATION,
+    }
+
+    stage_logger.info(
+        tr("deploy.deploy_obs.ntp_start"),
+        progress_extra={"instance_id": instance_id, "servers": servers},
+    )
+    resp = client.post("/api", payload, headers=headers)
+    stage_logger.debug(
+        tr("deploy.deploy_obs.ntp_done"),
+        progress_extra={
+            "instance_id": instance_id,
+            "servers": servers,
+            "ntp_service_url": joined,
+            "keys": sorted(resp.keys()) if isinstance(resp, dict) else type(resp).__name__,
+        },
+    )
+    return resp
+
+
 def _wait_obs_instance(
     *,
     ctx: RunContext,
@@ -982,7 +1088,7 @@ def _wait_obs_instance(
     interval: int | None = None,
 ) -> dict | None:
     if not token:
-        stage_logger.warning("缺少 CloudTower token，跳过 OBS 实例状态轮询")
+        stage_logger.warning(tr("deploy.deploy_obs.wait_instance_no_token"))
         return None
 
     wait_timeout = timeout or int(api_cfg.get("obs_instance_wait_timeout", DEFAULT_INSTANCE_WAIT_TIMEOUT)) if isinstance(api_cfg, dict) else DEFAULT_INSTANCE_WAIT_TIMEOUT
@@ -990,7 +1096,8 @@ def _wait_obs_instance(
 
     deadline = time.monotonic() + wait_timeout
     stage_logger.info(
-        "等待 OBS 实例状态", progress_extra={"timeout_s": wait_timeout, "interval_s": wait_interval, "name": name}
+        tr("deploy.deploy_obs.wait_instance_poll"),
+        progress_extra={"timeout_s": wait_timeout, "interval_s": wait_interval, "name": name},
     )
 
     last_resp: dict | None = None
@@ -1028,25 +1135,30 @@ def _wait_obs_instance(
         vm_status = str(vm_info.get("status") or "").upper() if isinstance(vm_info, dict) else None
 
         if status in {"SUCCESS", "SUCCEEDED"} or vm_status == "RUNNING":
-            stage_logger.info("OBS 实例已就绪", progress_extra={"status": status, "vm_status": vm_status, "instance_id": instance_id})
+            stage_logger.info(
+                tr("deploy.deploy_obs.wait_instance_ready"),
+                progress_extra={"status": status, "vm_status": vm_status, "instance_id": instance_id},
+            )
             return target
         if status in {"FAILED", "ERROR"}:
             raise RuntimeError(f"OBS 实例部署失败: {status}")
 
         time.sleep(wait_interval)
 
-    stage_logger.warning("OBS 实例未在超时时间内就绪", progress_extra={"timeout_s": wait_timeout})
+    stage_logger.warning(tr("deploy.deploy_obs.wait_instance_timeout"), progress_extra={"timeout_s": wait_timeout})
     return last_resp
 
 
-@stage_handler(Stage.deploy_obs)
+@stage_handler(Stage.deploy_obs) # type: ignore
 def handle_deploy_obs(ctx_dict):
     """独立的 OBS 上传与校验实现，不复用通用 app_upload 模块。"""
 
     ctx: RunContext = ctx_dict["ctx"]  # type: ignore[index]
     stage_logger = create_stage_progress_logger(ctx, Stage.deploy_obs.value, logger=logger, prefix="[deploy_obs]")
 
+    _reset_plan_context(ctx)
     _ensure_plan_loaded(ctx)
+    _delay_between_steps(stage_logger, "plan_loaded")
 
     cfg = ctx.config or load_config(DEFAULT_CONFIG_FILE)
     cfg_dict = cfg if isinstance(cfg, dict) else {}
@@ -1065,7 +1177,7 @@ def handle_deploy_obs(ctx_dict):
     search_roots = [work_dir, PROJECT_ROOT, PROJECT_ROOT / "release", PROJECT_ROOT / "resources", PROJECT_ROOT / "artifacts"]
 
     package_path = find_latest_package(
-        app=type("ObsSpec", (), {"package_pattern": OBS_PACKAGE_PATTERN, "name_regex": OBS_NAME_REGEX}),
+        app=type("ObsSpec", (), {"package_pattern": OBS_PACKAGE_PATTERN, "name_regex": OBS_NAME_REGEX}), # type: ignore
         search_roots=search_roots,
     )
 
@@ -1074,9 +1186,11 @@ def handle_deploy_obs(ctx_dict):
     cookie = login_result.get("cookie") if isinstance(login_result, dict) else None
     ct_token = login_result.get("token") if isinstance(login_result, dict) else None
 
+    _delay_between_steps(stage_logger, "after_login")
+
     if not cookie:
         stage_logger.error(
-            "CloudTower 登录失败：未获取到 cookie",
+            tr("deploy.deploy_obs.login_no_cookie"),
             progress_extra={"base_url": base_url, "login_keys": sorted(login_result.keys()) if isinstance(login_result, dict) else type(login_result).__name__},
         )
         raise RuntimeError("OBS 部署中断：CloudTower 登录失败，缺少 cookie")
@@ -1085,7 +1199,8 @@ def handle_deploy_obs(ctx_dict):
     client = APIClient(base_url=base_url, mock=False, timeout=timeout, verify=verify_ssl)
 
     stage_logger.info(
-        "开始 OBS 上传", progress_extra={"file": package_path.name, "base_url": base_url, "chunk_size": chunk_size, "dry_run": dry_run}
+        tr("deploy.deploy_obs.start_upload"),
+        progress_extra={"file": package_path.name, "base_url": base_url, "chunk_size": chunk_size, "dry_run": dry_run},
     )
 
     if dry_run:
@@ -1097,6 +1212,7 @@ def handle_deploy_obs(ctx_dict):
         }
     else:
         pre_verify = _verify_obs_pak_instance(ctx, api_cfg, base_url, stage_logger, cookie=cookie, ct_token=ct_token)
+        _delay_between_steps(stage_logger, "after_pre_verify")
         already_present, existing_version = _is_package_already_present(pre_verify, package_path)
 
         upload_id = None
@@ -1104,18 +1220,22 @@ def handle_deploy_obs(ctx_dict):
         tasks_resp = None
         install_create_resp = None
         install_wait_resp = None
+        ntp_resp = None
         system_service_resp = None
 
         if already_present:
             stage_logger.info(
-                "检测到 OBS 安装包已存在，跳过上传",
+                tr("deploy.deploy_obs.package_exists_skip"),
                 progress_extra={"package": package_path.name, "version": existing_version},
             )
             verify_resp = pre_verify
         else:
             upload_id = _init_upload(client, package_path.name, headers, stage_logger)
+            _delay_between_steps(stage_logger, "after_init_upload")
             _upload_chunks(client, upload_id, package_path, headers, stage_logger, chunk_size)
+            _delay_between_steps(stage_logger, "after_upload_chunks")
             commit_resp = _commit_upload(client, upload_id, headers, stage_logger)
+            _delay_between_steps(stage_logger, "after_commit_upload")
             tasks_resp = _wait_obs_tasks(
                 base_url=base_url,
                 token=ct_token,
@@ -1123,7 +1243,9 @@ def handle_deploy_obs(ctx_dict):
                 api_cfg=api_cfg,
                 package_name=package_path.name,
             )
+            _delay_between_steps(stage_logger, "after_wait_tasks")
             verify_resp = _verify_obs_pak_instance(ctx, api_cfg, base_url, stage_logger, cookie=cookie, ct_token=ct_token)
+            _delay_between_steps(stage_logger, "after_verify_post_upload")
 
         associate_resp = None
         try:
@@ -1150,6 +1272,8 @@ def handle_deploy_obs(ctx_dict):
 
             if not instance_id and cluster_id and cookie:
                 vm_spec, obs_name = _resolve_obs_vm_spec(ctx, deploy_cfg)
+                if not obs_name:
+                    obs_name = DEFAULT_OBS_NAME
                 package = _select_obs_package_for_install(verify_resp, package_path)
                 package_id = package.get("id") if isinstance(package, dict) else None
                 vnet_id = None
@@ -1163,7 +1287,7 @@ def handle_deploy_obs(ctx_dict):
                             api_cfg=api_cfg,
                         )
                     except Exception as exc:  # noqa: BLE001 - tolerate
-                        stage_logger.warning("查询虚拟网络失败（已忽略）", progress_extra={"error": str(exc)})
+                        stage_logger.warning(tr("deploy.deploy_obs.query_vnet_fail"), progress_extra={"error": str(exc)})
 
                 if vm_spec:
                     if vnet_id:
@@ -1171,17 +1295,17 @@ def handle_deploy_obs(ctx_dict):
 
                 if not vm_spec:
                     stage_logger.warning(
-                        "OBS 安装跳过：缺少必需的 VM 规格字段 (ip/subnet/gateway)",
+                        tr("deploy.deploy_obs.missing_vm_spec_skip"),
                         progress_extra={"cluster_id": cluster_id},
                     )
                 elif not vnet_id:
                     stage_logger.warning(
-                        "OBS 安装跳过：未获取到虚拟网络 ID",
+                        tr("deploy.deploy_obs.missing_vnet_skip"),
                         progress_extra={"vnet_name": "default"},
                     )
                 elif not package_id:
                     stage_logger.warning(
-                        "OBS 安装跳过：未找到可用的 Observability 包",
+                        tr("deploy.deploy_obs.missing_package_skip"),
                         progress_extra={"package": package_path.name},
                     )
                 else:
@@ -1205,6 +1329,7 @@ def handle_deploy_obs(ctx_dict):
                         cookie=cookie,
                         token=ct_token,
                     )
+                    _delay_between_steps(stage_logger, "after_wait_instance")
                     instance_id = None
                     if isinstance(install_wait_resp, dict):
                         instance_id = install_wait_resp.get("id") or _extract_obs_instance_id(install_wait_resp)
@@ -1212,6 +1337,30 @@ def handle_deploy_obs(ctx_dict):
                         instance_id = _extract_obs_instance_id(verify_resp)
 
             if instance_id and cookie:
+                ntp_servers = _resolve_ntp_servers(ctx, api_cfg, deploy_cfg)
+                if ntp_servers:
+                    try:
+                        ntp_resp = _update_obs_ntp(
+                            base_url=base_url,
+                            cookie=cookie,
+                            token=ct_token,
+                            instance_id=str(instance_id),
+                            servers=ntp_servers,
+                            stage_logger=stage_logger,
+                            api_cfg=api_cfg,
+                        )
+                        _delay_between_steps(stage_logger, "after_ntp_update")
+                    except Exception as exc:  # noqa: BLE001 - non-fatal
+                        stage_logger.warning(
+                            tr("deploy.deploy_obs.ntp_update_fail"),
+                            progress_extra={"error": str(exc)},
+                        )
+                else:
+                    stage_logger.info(
+                        tr("deploy.deploy_obs.ntp_skip_no_servers"),
+                        progress_extra={"instance_id": instance_id},
+                    )
+
                 try:
                     system_service_resp = _associate_obs_system_service(
                         base_url=base_url,
@@ -1221,9 +1370,10 @@ def handle_deploy_obs(ctx_dict):
                         stage_logger=stage_logger,
                         api_cfg=api_cfg,
                     )
+                    _delay_between_steps(stage_logger, "after_associate_system_service")
                 except Exception as exc:  # noqa: BLE001 - non-fatal
                     stage_logger.warning(
-                        "OBS 系统服务关联失败（已忽略）",
+                        tr("deploy.deploy_obs.associate_system_service_fail"),
                         progress_extra={"error": str(exc)},
                     )
 
@@ -1239,16 +1389,16 @@ def handle_deploy_obs(ctx_dict):
                     )
                 else:
                     stage_logger.info(
-                        "OBS 关联未执行：未获取到集群名称",
+                        tr("deploy.deploy_obs.associate_skip_no_cluster"),
                         progress_extra={"instance_id": instance_id, "cluster_name": cluster_name, "cluster_id": cluster_id},
                     )
             else:
                 stage_logger.info(
-                    "OBS 关联未执行：未获取到实例ID或 cookie",
+                    tr("deploy.deploy_obs.associate_skip_no_instance"),
                     progress_extra={"instance_id": instance_id, "cluster_name": cluster_name, "cluster_id": cluster_id},
                 )
         except Exception as exc:  # noqa: BLE001 - 不中断主流程
-            stage_logger.warning("OBS 安装或关联失败（已忽略）", progress_extra={"error": str(exc)})
+            stage_logger.warning(tr("deploy.deploy_obs.install_or_associate_fail"), progress_extra={"error": str(exc)})
 
         result = {
             "upload_id": upload_id,
@@ -1260,6 +1410,7 @@ def handle_deploy_obs(ctx_dict):
             "verified": verify_resp.get("verified") if isinstance(verify_resp, dict) else None,
             "version": verify_resp.get("version") if isinstance(verify_resp, dict) else None,
             "associate": associate_resp,
+            "ntp_update": ntp_resp,
             "associate_system_service": system_service_resp,
             "install_create": install_create_resp,
             "install_wait": install_wait_resp,

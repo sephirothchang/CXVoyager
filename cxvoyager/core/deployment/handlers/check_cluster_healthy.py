@@ -30,6 +30,7 @@ from cxvoyager.core.deployment.runtime_context import RunContext
 from cxvoyager.core.deployment.stage_manager import Stage, stage_handler
 from cxvoyager.integrations.smartx.api_client import APIClient
 from cxvoyager.integrations.excel.planning_sheet_parser import find_plan_file, parse_plan, to_model
+from cxvoyager.common.i18n import tr
 
 from .deploy_cloudtower import (
     CLOUDTOWER_GET_CLUSTERS_ENDPOINT,
@@ -150,7 +151,7 @@ def handle_check_cluster_healthy(ctx_dict: Dict[str, Any]) -> None:
     cfg_dict = cfg if isinstance(cfg, dict) else {}
     stage_cfg = dict(cfg_dict.get('cloudtower', {}).get('stage08') or {})
     if not _is_enabled(stage_cfg):
-        stage_logger.info("阶段 08 被配置为跳过，直接返回。")
+        stage_logger.info(tr("deploy.check_cluster_healthy.disabled"))
         ctx.extra['check_cluster_healthy'] = {"status": "SKIPPED", "reason": "disabled"}
         return
 
@@ -158,14 +159,14 @@ def handle_check_cluster_healthy(ctx_dict: Dict[str, Any]) -> None:
 
     deploy_info = ctx.extra.get('deploy_cloudtower') or {}
     if deploy_info.get('status') != 'SERVICE_READY':
-        stage_logger.info("未发现阶段 04/05 输出，尝试直接探测 CloudTower 服务")
+        stage_logger.info(tr("deploy.check_cluster_healthy.no_stage4_output_probe"))
         cloud_cfg = cfg_dict.get('cloudtower', {}) if isinstance(cfg_dict, dict) else {}
         cloudtower_ip = _resolve_cloudtower_ip(plan_model, parsed_plan, cloud_cfg, stage_logger)
         if not cloudtower_ip:
             raise RuntimeError("缺少 CloudTower IP，无法执行巡检。")
 
         stage_logger.info(
-            "检测 CloudTower 443 端口连通性",
+            tr("deploy.check_cluster_healthy.probe_port"),
             progress_extra={"ip": cloudtower_ip, "port": 443},
         )
         if not check_port(cloudtower_ip, 443, timeout=5.0):
@@ -189,7 +190,7 @@ def handle_check_cluster_healthy(ctx_dict: Dict[str, Any]) -> None:
             },
         }
         ctx.extra['deploy_cloudtower'] = deploy_info
-        stage_logger.info("CloudTower 已就绪，使用探测结果继续巡检", progress_extra={"ip": cloudtower_ip})
+        stage_logger.info(tr("deploy.check_cluster_healthy.probe_success_continue"), progress_extra={"ip": cloudtower_ip})
 
     cloudtower_ip = deploy_info.get('ip')
     if not cloudtower_ip:
@@ -206,7 +207,7 @@ def handle_check_cluster_healthy(ctx_dict: Dict[str, Any]) -> None:
     session = (deploy_info.get('cloudtower') or {}).get('session') or {}
     token = session.get('token')
     if not token:
-        stage_logger.warning("未发现 CloudTower token，尝试重新登录。")
+        stage_logger.warning(tr("deploy.check_cluster_healthy.missing_token_login"))
         token = _cloudtower_login(client=client, ip=cloudtower_ip, stage_logger=stage_logger)
     client.session.headers['Authorization'] = token
     headers = {"content-type": "application/json", "Authorization": token}
@@ -229,7 +230,7 @@ def handle_check_cluster_healthy(ctx_dict: Dict[str, Any]) -> None:
 
     items = _resolve_inspector_items(stage_cfg)
     stage_logger.info(
-        "提交 CloudTower 巡检任务",
+        tr("deploy.check_cluster_healthy.submit_job"),
         progress_extra={
             "cluster_uuid": cluster_uuid,
             "version": inspector_version,
@@ -248,7 +249,7 @@ def handle_check_cluster_healthy(ctx_dict: Dict[str, Any]) -> None:
         raise RuntimeError("CloudTower 巡检任务请求未返回任务 ID。")
 
     stage_logger.info(
-        "巡检任务已提交，等待任务完成后再导出报告",
+        tr("deploy.check_cluster_healthy.job_submitted_wait"),
         progress_extra={
             "job_id": job_id,
             "poll_interval": poll_interval,
@@ -280,7 +281,7 @@ def handle_check_cluster_healthy(ctx_dict: Dict[str, Any]) -> None:
         raise RuntimeError("巡检导出接口未返回报告文件名。")
 
     stage_logger.info(
-        "巡检任务已提交，等待导出完成",
+        tr("deploy.check_cluster_healthy.export_submitted_wait"),
         progress_extra={
             "job_id": job_id,
             "filename": filename,
@@ -312,7 +313,7 @@ def handle_check_cluster_healthy(ctx_dict: Dict[str, Any]) -> None:
     target_path.write_bytes(response.content)
 
     stage_logger.info(
-        "巡检报告下载完成",
+        tr("deploy.check_cluster_healthy.download_done"),
         progress_extra={
             "job_id": job_id,
             "file": str(target_path),
@@ -361,12 +362,12 @@ def _wait_for_export(
         )
         status = _extract_str(status_response, 'status')
         if status == 'EXPORT_SUCCEEDED':
-            stage_logger.info("巡检报告导出成功")
+            stage_logger.info(tr("deploy.check_cluster_healthy.export_success"))
             return
         if status == 'EXPORT_FAILED':
             raise RuntimeError("CloudTower 巡检报告导出失败")
         stage_logger.debug(
-            "巡检报告导出进行中",
+            tr("deploy.check_cluster_healthy.export_running"),
             progress_extra={"status": status or "UNKNOWN", "wait": poll_interval},
         )
         time.sleep(poll_interval)
@@ -390,12 +391,12 @@ def _wait_for_job_completion(
         status_response = client.get(endpoint, headers=headers)
         status = _extract_str(status_response, 'status')
         if status in {"SUCCEEDED", "FINISHED", "SUCCESS"}:
-            stage_logger.info("巡检任务已完成", progress_extra={"job_id": job_id, "status": status})
+            stage_logger.info(tr("deploy.check_cluster_healthy.job_done"), progress_extra={"job_id": job_id, "status": status})
             return
         if status in {"FAILED", "ERROR"}:
             raise RuntimeError(f"CloudTower 巡检任务失败，status={status}")
         stage_logger.debug(
-            "巡检任务进行中",
+            tr("deploy.check_cluster_healthy.job_running"),
             progress_extra={"job_id": job_id, "status": status or "UNKNOWN", "wait": poll_interval},
         )
         time.sleep(poll_interval)
@@ -449,11 +450,17 @@ def _ensure_plan_for_inspector(ctx: RunContext, stage_logger: logging.LoggerAdap
             ctx.plan = plan_model
             if isinstance(ctx.extra, dict):
                 ctx.extra['parsed_plan'] = parsed_plan
-            stage_logger.info("已自动加载规划表", progress_extra={"plan_path": str(plan_path)})
+            stage_logger.info(tr("deploy.check_cluster_healthy.plan_loaded"), progress_extra={"plan_path": str(plan_path)})
         else:
-            stage_logger.warning("未找到规划表，将继续使用配置项", progress_extra={"base_dir": str(base_dir) if base_dir else ""})
+            stage_logger.warning(
+                tr("deploy.check_cluster_healthy.plan_not_found"),
+                progress_extra={"base_dir": str(base_dir) if base_dir else ""},
+            )
     except Exception as exc:  # noqa: BLE001
-        stage_logger.warning("自动加载规划表失败，将继续使用配置项", progress_extra={"error": str(exc)})
+        stage_logger.warning(
+            tr("deploy.check_cluster_healthy.plan_load_failed"),
+            progress_extra={"error": str(exc)},
+        )
 
     return plan_model, parsed_plan
 
@@ -479,7 +486,7 @@ def _ensure_cluster_identity(
         if cluster_id and cluster_uuid:
             return cluster_id, cluster_uuid
 
-    stage_logger.info("未从阶段 05 缓存获得集群信息，正在查询 CloudTower 集群列表。")
+    stage_logger.info(tr("deploy.check_cluster_healthy.cluster_cache_miss"))
     response = client.post(CLOUDTOWER_GET_CLUSTERS_ENDPOINT, payload={}, headers=headers)
     clusters = _extract_cluster_list_for_inspector(response)
     if not clusters:
@@ -498,7 +505,7 @@ def _ensure_cluster_identity(
         raise RuntimeError("CloudTower 集群详情缺少标识信息。")
 
     stage_logger.info(
-        "已自动选取集群用于巡检",
+        tr("deploy.check_cluster_healthy.cluster_auto_selected"),
         progress_extra={"cluster_id": cluster_id, "cluster_uuid": cluster_uuid},
     )
     return cluster_id, cluster_uuid

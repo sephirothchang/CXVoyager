@@ -31,6 +31,7 @@ from cxvoyager.core.deployment.runtime_context import RunContext
 from cxvoyager.core.deployment.stage_manager import Stage, stage_handler
 from cxvoyager.integrations.smartx.api_client import APIClient
 from cxvoyager.integrations.excel.planning_sheet_parser import find_plan_file, parse_plan, to_model
+from cxvoyager.common.i18n import tr
 
 from .deploy_cloudtower import (
     CLOUDTOWER_CLUSTER_POLL_INTERVAL,
@@ -65,11 +66,17 @@ def _ensure_plan_for_attach(ctx: RunContext, stage_logger: logging.LoggerAdapter
             ctx.plan = plan_model
             if isinstance(ctx.extra, dict):
                 ctx.extra['parsed_plan'] = parsed_plan
-            stage_logger.info("已自动加载规划表", progress_extra={"plan_path": str(plan_path)})
+            stage_logger.info(tr("deploy.attach_cluster.plan_loaded"), progress_extra={"plan_path": str(plan_path)})
         else:
-            stage_logger.warning("未找到规划表，将继续尝试配置项", progress_extra={"base_dir": str(base_dir)})
+            stage_logger.warning(
+                tr("deploy.attach_cluster.plan_not_found"),
+                progress_extra={"base_dir": str(base_dir)},
+            )
     except Exception as exc:  # noqa: BLE001
-        stage_logger.warning("自动加载规划表失败，将继续尝试配置项", progress_extra={"error": str(exc)})
+        stage_logger.warning(
+            tr("deploy.attach_cluster.plan_load_failed"),
+            progress_extra={"error": str(exc)},
+        )
 
     return plan_model, parsed_plan
 
@@ -84,7 +91,7 @@ def _fetch_existing_organization(client: APIClient, stage_logger: logging.Logger
     try:
         response = client.post("/v2/api/get-organizations", payload={}, headers=headers)
     except Exception as exc:  # noqa: BLE001
-        stage_logger.warning("查询组织列表失败，将继续尝试", progress_extra={"error": str(exc)})
+        stage_logger.warning(tr("deploy.attach_cluster.org_query_fail_retry"), progress_extra={"error": str(exc)})
         return {}
 
     # 返回固定为列表形态：[{"datacenters": [...], "id": "string", "name": "string"}]
@@ -92,7 +99,10 @@ def _fetch_existing_organization(client: APIClient, stage_logger: logging.Logger
     if isinstance(response, list):
         orgs = [item for item in response if isinstance(item, dict)]
     else:
-        stage_logger.warning("组织接口返回非列表，后续可能失败", progress_extra={"type": type(response).__name__})
+        stage_logger.warning(
+            tr("deploy.attach_cluster.org_response_not_list"),
+            progress_extra={"type": type(response).__name__},
+        )
 
     if orgs:
         first = orgs[0]
@@ -102,7 +112,7 @@ def _fetch_existing_organization(client: APIClient, stage_logger: logging.Logger
         )
         return first
 
-    stage_logger.warning("未获取到组织列表，后续步骤可能失败")
+    stage_logger.warning(tr("deploy.attach_cluster.org_list_empty"))
     return {}
 
 
@@ -120,16 +130,13 @@ def handle_attach_cluster(ctx_dict: Dict[str, Any]) -> None:
 
     deploy_info = ctx.extra.get('deploy_cloudtower') or {}
     if not deploy_info or deploy_info.get('status') != 'SERVICE_READY':
-        stage_logger.info("未发现阶段 04 的输出，尝试直接探测已有 CloudTower 服务")
+        stage_logger.info(tr("deploy.attach_cluster.no_stage4_output_probe"))
         cloud_cfg = cfg_dict.get('cloudtower', {}) if isinstance(cfg_dict, dict) else {}
         cloudtower_ip = _resolve_cloudtower_ip(plan_model, parsed_plan, cloud_cfg, stage_logger)
         if not cloudtower_ip:
             raise RuntimeError("缺少 CloudTower IP，无法执行探测与关联。")
 
-        stage_logger.info(
-            "检测 CloudTower 443 端口连通性",
-            progress_extra={"ip": cloudtower_ip, "port": 443},
-        )
+        stage_logger.info(tr("deploy.attach_cluster.probe_port"), progress_extra={"ip": cloudtower_ip, "port": 443})
         if not check_port(cloudtower_ip, 443, timeout=5.0):
             raise RuntimeError("CloudTower 443 端口不可达，无法执行关联。")
 
@@ -163,7 +170,7 @@ def handle_attach_cluster(ctx_dict: Dict[str, Any]) -> None:
             },
         }
         ctx.extra['deploy_cloudtower'] = deploy_info
-        stage_logger.info("CloudTower 已就绪，使用探测结果继续关联", progress_extra={"ip": cloudtower_ip})
+        stage_logger.info(tr("deploy.attach_cluster.probe_success_continue"), progress_extra={"ip": cloudtower_ip})
 
     cloudtower_ip = deploy_info.get('ip')
     if not cloudtower_ip:
@@ -189,7 +196,7 @@ def handle_attach_cluster(ctx_dict: Dict[str, Any]) -> None:
     cluster_password = (inputs.get('cluster_password') or 'HC!r0cks').strip()
 
     stage_logger.info(
-        "开始执行 CloudTower 集群关联",
+        tr("deploy.attach_cluster.start"),
         progress_extra={
             "cloudtower_ip": cloudtower_ip,
             "datacenter_name": datacenter_name,
@@ -205,7 +212,7 @@ def handle_attach_cluster(ctx_dict: Dict[str, Any]) -> None:
     )
     token = session.get('token')
     if not token:
-        stage_logger.warning("未在上下文中找到 CloudTower token，尝试重新登录。")
+        stage_logger.warning(tr("deploy.attach_cluster.missing_token_login"))
         token = _cloudtower_login(client=client, ip=cloudtower_ip, stage_logger=stage_logger)
 
     headers = {
@@ -238,7 +245,7 @@ def handle_attach_cluster(ctx_dict: Dict[str, Any]) -> None:
     }
 
     stage_logger.info(
-        "CloudTower 集群关联成功",
+        tr("deploy.attach_cluster.success"),
         progress_extra={
             "datacenter_id": datacenter_id,
             "cluster_id": cluster_info.get('id'),
@@ -256,7 +263,7 @@ def _create_cloudtower_datacenter(
     stage_logger: logging.LoggerAdapter,
 ) -> str:
     stage_logger.info(
-        "创建 CloudTower 数据中心",
+        tr("deploy.attach_cluster.create_datacenter"),
         progress_extra={"organization_id": organization_id, "datacenter_name": datacenter_name},
     )
 
@@ -267,7 +274,7 @@ def _create_cloudtower_datacenter(
     datacenter_id = datacenter.get('id') if isinstance(datacenter, dict) else None
     if not datacenter_id:
         raise RuntimeError("创建数据中心失败：未返回 ID")
-    stage_logger.debug("数据中心创建返回", progress_extra={"datacenter_id": datacenter_id})
+    stage_logger.debug(tr("deploy.attach_cluster.datacenter_created_debug"), progress_extra={"datacenter_id": datacenter_id})
     return str(datacenter_id)
 
 
@@ -282,7 +289,7 @@ def _connect_cloudtower_cluster(
     stage_logger: logging.LoggerAdapter,
 ) -> Dict[str, Any]:
     stage_logger.info(
-        "开始关联集群",
+        tr("deploy.attach_cluster.connect_cluster"),
         progress_extra={"datacenter_id": datacenter_id, "cluster_vip": cluster_vip, "username": username},
     )
 
@@ -298,7 +305,10 @@ def _connect_cloudtower_cluster(
     cluster_id = cluster_stub.get('id') if isinstance(cluster_stub, dict) else None
     task_id = data.get('task_id')
     if cluster_id:
-        stage_logger.debug("CloudTower 返回集群标识", progress_extra={"cluster_id": cluster_id, "task_id": task_id})
+        stage_logger.debug(
+            tr("deploy.attach_cluster.cluster_id_debug"),
+            progress_extra={"cluster_id": cluster_id, "task_id": task_id},
+        )
 
     cluster = _poll_cloudtower_cluster_status(
         client=client,
@@ -330,7 +340,7 @@ def _poll_cloudtower_cluster_status(
             if expected_cluster_id and cid == expected_cluster_id or expected_cluster_ip and cip == expected_cluster_ip:
                 state = str(cluster.get('connect_state') or '').upper()
                 stage_logger.debug(
-                    "集群状态更新",
+                    tr("deploy.attach_cluster.cluster_status_update"),
                     progress_extra={"cluster_id": cid or cip, "connect_state": state},
                 )
                 if state == 'CONNECTED':
@@ -338,7 +348,7 @@ def _poll_cloudtower_cluster_status(
                 if state in {"FAILED", "ERROR"}:
                     raise RuntimeError(f"CloudTower 集群关联失败，状态：{state}")
         stage_logger.info(
-            "等待 CloudTower 集群关联完成",
+            tr("deploy.attach_cluster.wait_cluster_attach"),
             progress_extra={"interval": CLOUDTOWER_CLUSTER_POLL_INTERVAL},
         )
         time.sleep(CLOUDTOWER_CLUSTER_POLL_INTERVAL)

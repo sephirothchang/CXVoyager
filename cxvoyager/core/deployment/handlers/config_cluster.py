@@ -34,6 +34,7 @@ from cxvoyager.core.deployment.progress import create_stage_progress_logger
 from cxvoyager.common.config import load_config
 from cxvoyager.common.system_constants import DEFAULT_CONFIG_FILE
 from cxvoyager.common.parallel_utils import parallel_map
+from cxvoyager.common.i18n import tr
 from cxvoyager.integrations.smartx.api_client import APIClient, APIError
 from cxvoyager.integrations.excel import field_variables as plan_vars
 
@@ -48,12 +49,12 @@ def run_config_cluster_stage(ctx_dict):
     stage_logger = create_stage_progress_logger(ctx, stage_name, logger=logger, prefix="[config_cluster]")
 
     # === 1. 阶段入口与前置校验 ===
-    stage_logger.info("开始执行集群配置阶段")
+    stage_logger.info(tr("deploy.config_cluster.start"))
 
     verify_result = ctx.extra.get('deploy_verify')
     if not _is_deployment_successful(verify_result):
-        stage_logger.error("部署校验尚未通过，无法执行集群配置")
-        raise RuntimeError("集群尚未部署成功，无法开始配置阶段")
+        stage_logger.error(tr("deploy.config_cluster.verify_blocked"))
+        raise RuntimeError(tr("deploy.config_cluster.verify_blocked_raise"))
 
     cfg = ctx.config or load_config(DEFAULT_CONFIG_FILE)
     ctx.config = cfg
@@ -63,20 +64,20 @@ def run_config_cluster_stage(ctx_dict):
     timeout = int(api_cfg.get('timeout', 10))
     use_mock = bool(api_cfg.get('mock', False))
     stage_logger.debug(
-        "API 认证配置已加载",
+        tr("deploy.config_cluster.api_auth_loaded"),
         progress_extra={"base_url_override": base_url_override, "timeout": timeout, "use_mock": use_mock},
     )
 
     host_info = ctx.extra.get('host_scan')
     if not isinstance(host_info, dict) or not host_info:
-        stage_logger.error("缺少主机扫描数据，无法确定集群 API 地址")
-        raise RuntimeError("缺少主机扫描数据，无法确定集群 API 地址")
-    stage_logger.debug("主机扫描结果已准备就绪", progress_extra={"hosts": list(host_info.keys())})
+        stage_logger.error(tr("deploy.config_cluster.host_scan_missing"))
+        raise RuntimeError(tr("deploy.config_cluster.host_scan_missing"))
+    stage_logger.debug(tr("deploy.config_cluster.host_scan_ready"), progress_extra={"hosts": list(host_info.keys())})
 
     base_url, host_header = _resolve_deployment_base(base_url_override, host_info)
     client = APIClient(base_url=base_url, mock=use_mock, timeout=timeout)
     stage_logger.debug(
-        "SmartX API 客户端初始化完成",
+        tr("deploy.config_cluster.api_client_ready"),
         progress_extra={"base_url": base_url, "timeout": timeout, "mock": use_mock},
     )
 
@@ -89,7 +90,7 @@ def run_config_cluster_stage(ctx_dict):
     sanitized_headers = {
         key: ("***" if "token" in key.lower() else value) for key, value in base_headers.items()
     }
-    stage_logger.debug("HTTP 请求基础头部已设置", progress_extra=sanitized_headers)
+    stage_logger.debug(tr("deploy.config_cluster.base_headers_ready"), progress_extra=sanitized_headers)
 
     # === 2. 解析规划表，提取部署参数 ===
     parsed_plan = ctx.extra.get('parsed_plan')
@@ -100,10 +101,10 @@ def run_config_cluster_stage(ctx_dict):
 
             parsed_plan = parse_plan(Path(plan_source))
             ctx.extra['parsed_plan'] = parsed_plan
-            stage_logger.info("已重新解析规划表，准备集群配置", progress_extra={"source": plan_source})
+            stage_logger.info(tr("deploy.config_cluster.plan_reparse_ok"), progress_extra={"source": plan_source})
         except Exception as exc:  # noqa: BLE001 - 记录但不阻断
-            logger.debug("规划表解析异常详情", exc_info=exc)
-            stage_logger.warning(f"重新解析规划表失败: {exc}")
+            logger.debug(tr("deploy.config_cluster.plan_parse_debug"), exc_info=exc)
+            stage_logger.warning(tr("deploy.config_cluster.plan_reparse_warn", error=exc))
             parsed_plan = None
 
     fisheye_user, fisheye_password = _load_fisheye_credentials(parsed_plan)
@@ -111,7 +112,7 @@ def run_config_cluster_stage(ctx_dict):
     dns_servers = _parse_management_service_list(parsed_plan, "DNS 服务器")
     ntp_servers = _parse_management_service_list(parsed_plan, "NTP 服务器")
     stage_logger.debug(
-        "规划表提取关键参数",
+        tr("deploy.config_cluster.plan_params_extracted"),
         progress_extra={
             "fisheye_user": fisheye_user,
             "cluster_vip": cluster_vip,
@@ -133,32 +134,32 @@ def run_config_cluster_stage(ctx_dict):
     }
     if fisheye_user:
         password_payload["username"] = fisheye_user
-    stage_logger.info("正在初始化 Fisheye 管理员密码")
+    stage_logger.info(tr("deploy.config_cluster.fisheye_init"))
     stage_logger.debug(
-        "Fisheye 初始化请求载荷",
+        tr("deploy.config_cluster.fisheye_init_payload"),
         progress_extra={"username": password_payload.get("username"), "password_length": len(fisheye_password or "")},
     )
-    _send_post_request(client, "/api/v3/users:setupRoot", password_payload, base_headers, "初始化 Fisheye 管理员密码", results)
+    _send_post_request(client, "/api/v3/users:setupRoot", password_payload, base_headers, tr("deploy.config_cluster.action_fisheye_init"), results)
     password_entry = results[-1]
     if password_entry.get("status") == "ok":
-        stage_logger.info("Fisheye 管理员密码初始化完成")
+        stage_logger.info(tr("deploy.config_cluster.fisheye_init_done"))
     else:
-        stage_logger.warning("Fisheye 管理员密码初始化失败，请人工处理")
+        stage_logger.error(tr("deploy.config_cluster.fisheye_init_fail"))
 
     login_payload = {
         "username": fisheye_user or "root",
         "password": fisheye_password,
         "encrypted": False,
     }
-    stage_logger.info("正在登录 Fisheye 获取 token")
-    stage_logger.debug("Fisheye 登录载荷", progress_extra={"username": login_payload["username"]})
-    session_resp = _send_post_request(client, "/api/v3/sessions", login_payload, base_headers, "登录 Fisheye 获取凭证", results)
+    stage_logger.info(tr("deploy.config_cluster.fisheye_login"))
+    stage_logger.debug(tr("deploy.config_cluster.fisheye_login_payload"), progress_extra={"username": login_payload["username"]})
+    session_resp = _send_post_request(client, "/api/v3/sessions", login_payload, base_headers, tr("deploy.config_cluster.action_fisheye_login"), results)
     session_entry = results[-1]
     session_token = _extract_api_token(session_resp)
     if session_entry.get("status") == "ok" and session_token:
-        stage_logger.info("成功获取 Fisheye 会话 token")
+        stage_logger.info(tr("deploy.config_cluster.fisheye_token_obtained"))
     else:
-        warning_msg = "Fisheye 登录未返回有效 token，请人工处理并重新执行"
+        warning_msg = tr("deploy.config_cluster.fisheye_token_missing")
         stage_logger.warning(warning_msg)
         results.append({"action": "获取 Fisheye 会话 token", "status": "warning", "error": warning_msg})
         session_token = None
@@ -167,57 +168,57 @@ def run_config_cluster_stage(ctx_dict):
     if session_token:
         auth_headers["x-smartx-token"] = session_token
     stage_logger.debug(
-        "鉴权头部已更新为会话 token",
+        tr("deploy.config_cluster.auth_headers_updated"),
         progress_extra={key: ("***" if "token" in key.lower() else value) for key, value in auth_headers.items()},
     )
 
     # === 4. 配置集群网络与基础服务 ===
     if cluster_vip:
         vip_payload = {"iscsi_vip": None, "management_vip": cluster_vip}
-        stage_logger.info(f"正在配置管理 VIP: {cluster_vip}")
-        stage_logger.debug("VIP 配置载荷", progress_extra=vip_payload)
-        _send_put_request(client, "/api/v2/settings/vip", vip_payload, auth_headers, "配置管理 VIP", results)
+        stage_logger.info(tr("deploy.config_cluster.vip_config_start", vip=cluster_vip))
+        stage_logger.debug(tr("deploy.config_cluster.vip_payload"), progress_extra=vip_payload)
+        _send_put_request(client, "/api/v2/settings/vip", vip_payload, auth_headers, tr("deploy.config_cluster.action_configure_vip"), results)
         vip_entry = results[-1]
         if vip_entry.get("status") == "ok":
-            stage_logger.info("管理 VIP 配置完成")
+            stage_logger.info(tr("deploy.config_cluster.vip_config_done"))
         else:
-            stage_logger.warning("管理 VIP 配置失败，请人工确认")
+            stage_logger.error(tr("deploy.config_cluster.vip_config_fail"))
     else:
-        stage_logger.warning("规划表未提供管理 VIP，跳过配置")
+        stage_logger.warning(tr("deploy.config_cluster.vip_missing_skip"))
 
     if dns_servers:
         dns_payload = {"dns_servers": dns_servers}
-        stage_logger.info(f"正在配置 DNS 服务器，共 {len(dns_servers)} 个")
-        stage_logger.debug("DNS 配置载荷", progress_extra=dns_payload)
-        _send_put_request(client, "/api/v2/settings/dns", dns_payload, auth_headers, "配置 DNS 服务器", results)
+        stage_logger.info(tr("deploy.config_cluster.dns_config_start", count=len(dns_servers)))
+        stage_logger.debug(tr("deploy.config_cluster.dns_payload"), progress_extra=dns_payload)
+        _send_put_request(client, "/api/v2/settings/dns", dns_payload, auth_headers, tr("deploy.config_cluster.action_configure_dns"), results)
         dns_entry = results[-1]
         if dns_entry.get("status") == "ok":
-            stage_logger.info("DNS 服务器配置完成")
+            stage_logger.info(tr("deploy.config_cluster.dns_config_done"))
         else:
-            stage_logger.warning("DNS 服务器配置失败，请人工确认")
+            stage_logger.error(tr("deploy.config_cluster.dns_config_fail"))
     else:
-        stage_logger.warning("规划表未提供 DNS 服务器，跳过配置")
+        stage_logger.warning(tr("deploy.config_cluster.dns_missing_skip"))
 
     if ntp_servers:
         ntp_payload = {"ntp_mode": "external", "ntp_servers": ntp_servers}
-        stage_logger.info(f"正在配置 NTP 服务器，共 {len(ntp_servers)} 个")
-        stage_logger.debug("NTP 配置载荷", progress_extra=ntp_payload)
-        _send_put_request(client, "/api/v2/settings/ntp", ntp_payload, auth_headers, "配置 NTP 服务器", results)
+        stage_logger.info(tr("deploy.config_cluster.ntp_config_start", count=len(ntp_servers)))
+        stage_logger.debug(tr("deploy.config_cluster.ntp_payload"), progress_extra=ntp_payload)
+        _send_put_request(client, "/api/v2/settings/ntp", ntp_payload, auth_headers, tr("deploy.config_cluster.action_configure_ntp"), results)
         ntp_entry = results[-1]
         if ntp_entry.get("status") == "ok":
-            stage_logger.info("NTP 服务器配置完成")
+            stage_logger.info(tr("deploy.config_cluster.ntp_config_done"))
         else:
-            stage_logger.warning("NTP 服务器配置失败，请人工确认")
+            stage_logger.error(tr("deploy.config_cluster.ntp_config_fail"))
     else:
-        stage_logger.warning("规划表未提供 NTP 服务器，跳过配置")
+        stage_logger.warning(tr("deploy.config_cluster.ntp_missing_skip"))
 
     # === 5. 配置 IPMI 帐号 ===
     ipmi_payload = _build_ipmi_accounts_payload(host_entries, host_info)
     if ipmi_payload:
         payload = cast(Dict[str, Any], ipmi_payload)
-        stage_logger.info(f"正在批量配置 IPMI 帐号，共 {len(payload['accounts'])} 台主机")
+        stage_logger.info(tr("deploy.config_cluster.ipmi_config_start", count=len(payload['accounts'])))
         stage_logger.debug(
-            "IPMI 配置载荷摘要",
+            tr("deploy.config_cluster.ipmi_payload_summary"),
             progress_extra={
                 "accounts": [
                     {
@@ -236,26 +237,26 @@ def run_config_cluster_stage(ctx_dict):
             "/api/v2/ipmi/upsert_accounts",
             payload,
             auth_headers,
-            "批量配置 IPMI 帐号",
+            tr("deploy.config_cluster.action_configure_ipmi"),
             results,
         )
         after_entry = results[-1] if len(results) > before_len else {"status": "ok"}
         if after_entry.get("status") == "warning":
             stage_logger.warning(
-                "IPMI 帐号配置未完全成功，已记录告警但继续执行",
+                tr("deploy.config_cluster.ipmi_partial_warn"),
                 progress_extra={"error": after_entry.get("error")},
             )
         else:
-            stage_logger.info("IPMI 帐号配置完成")
+            stage_logger.info(tr("deploy.config_cluster.ipmi_config_done"))
     else:
-        stage_logger.warning("未找到有效的 IPMI 配置数据，跳过此步骤")
+        stage_logger.warning(tr("deploy.config_cluster.ipmi_missing_skip"))
 
     # === 6. 配置业务虚拟交换机 ===
     business_vds_uuid: Optional[str] = None
     business_vds_payload = _build_business_vds_request_payload(parsed_plan, host_entries, host_info)
     if business_vds_payload:
         stage_logger.info(
-            "正在配置业务虚拟交换机",
+            tr("deploy.config_cluster.biz_vds_config_start"),
             progress_extra={
                 "name": business_vds_payload.get("name"),
                 "host_count": len(business_vds_payload.get("hosts_associated", [])),
@@ -267,7 +268,7 @@ def run_config_cluster_stage(ctx_dict):
             "/api/v2/network/vds",
             business_vds_payload,
             auth_headers,
-            "配置业务虚拟交换机",
+            tr("deploy.config_cluster.action_configure_biz_vds"),
             results,
         )
         vds_entry = results[-1]
@@ -277,14 +278,14 @@ def run_config_cluster_stage(ctx_dict):
                 job_id = _extract_job_id(vds_response)
                 if job_id:
                     stage_logger.info(
-                        "业务虚拟交换机创建返回任务，正在查询 UUID",
+                        tr("deploy.config_cluster.biz_vds_job_lookup"),
                         progress_extra={"job_id": job_id},
                     )
                     job_response = _fetch_json_response(
                         client,
                         f"/api/v2/jobs/{job_id}",
                         auth_headers,
-                        "查询业务虚拟交换机创建任务",
+                        tr("deploy.config_cluster.action_query_biz_vds_job"),
                         results,
                     )
                     job_entry = results[-1]
@@ -292,49 +293,49 @@ def run_config_cluster_stage(ctx_dict):
                         business_vds_uuid = _extract_vds_uuid_from_job(job_response)
                         if business_vds_uuid:
                             stage_logger.debug(
-                                "已从任务详情解析到业务虚拟交换机 UUID",
+                                tr("deploy.config_cluster.biz_vds_uuid_from_job"),
                                 progress_extra={"job_id": job_id, "vds_uuid": business_vds_uuid},
                             )
                         else:
                             stage_logger.warning(
-                                "任务详情未包含业务虚拟交换机 UUID",
+                                tr("deploy.config_cluster.biz_vds_job_missing_uuid"),
                                 progress_extra={"job_id": job_id},
                             )
                     else:
                         stage_logger.warning(
-                            "查询业务虚拟交换机创建任务失败，跳过业务虚拟网络创建",
+                            tr("deploy.config_cluster.biz_vds_job_query_fail_skip"),
                             progress_extra={"job_id": job_id, "error": job_entry.get("error")},
                         )
             if not business_vds_uuid and use_mock:
                 fallback_name = str(business_vds_payload.get("name") or "mock-vds")
                 business_vds_uuid = f"mock-{fallback_name}"
                 stage_logger.debug(
-                    "使用模拟 uuid 创建业务虚拟网络",
+                    tr("deploy.config_cluster.biz_vds_mock_uuid"),
                     progress_extra={"vds_uuid": business_vds_uuid},
                 )
             if business_vds_uuid:
                 stage_logger.info(
-                    "业务虚拟交换机配置完成",
+                    tr("deploy.config_cluster.biz_vds_config_done"),
                     progress_extra={"vds_uuid": business_vds_uuid},
                 )
             else:
-                stage_logger.warning("业务虚拟交换机创建响应缺少 uuid，跳过业务虚拟网络创建")
+                stage_logger.warning(tr("deploy.config_cluster.biz_vds_missing_uuid_skip"))
         else:
-            stage_logger.warning("业务虚拟交换机配置失败，请人工确认")
+            stage_logger.error(tr("deploy.config_cluster.biz_vds_config_fail"))
     else:
-        stage_logger.warning("未准备好业务虚拟交换机配置，跳过此步骤")
+        stage_logger.warning(tr("deploy.config_cluster.biz_vds_not_ready_skip"))
 
     if business_vds_uuid:
         business_network_payloads = _build_business_network_payloads(parsed_plan, business_vds_uuid)
         if business_network_payloads:
             stage_logger.info(
-                "正在创建业务虚拟网络",
+                tr("deploy.config_cluster.biz_network_create_start", count=len(business_network_payloads)),
                 progress_extra={"count": len(business_network_payloads)},
             )
             success = 0
             for payload in business_network_payloads:
                 name = payload.get("name") or "(未命名)"
-                action_desc = f"创建业务虚拟网络[{name}]"
+                action_desc = tr("deploy.config_cluster.action_create_biz_network", name=name)
                 _send_post_request(
                     client,
                     f"/api/v2/network/vds/{business_vds_uuid}/vlans",
@@ -347,12 +348,12 @@ def run_config_cluster_stage(ctx_dict):
                 if network_entry.get("status") == "ok":
                     success += 1
                     stage_logger.info(
-                        "业务虚拟网络创建成功",
+                        tr("deploy.config_cluster.biz_network_create_success"),
                         progress_extra={"name": name, "vlan_id": payload.get("vlan_id")},
                     )
                 else:
                     stage_logger.warning(
-                        "业务虚拟网络创建失败",
+                        tr("deploy.config_cluster.biz_network_create_fail"),
                         progress_extra={
                             "name": name,
                             "vlan_id": payload.get("vlan_id"),
@@ -360,14 +361,14 @@ def run_config_cluster_stage(ctx_dict):
                         },
                     )
             stage_logger.info(
-                "业务虚拟网络创建完成",
+                tr("deploy.config_cluster.biz_network_create_done"),
                 progress_extra={"success": success, "total": len(business_network_payloads)},
             )
             detail_response = _fetch_json_response(
                 client,
                 f"/api/v2/network/vds/{business_vds_uuid}",
                 auth_headers,
-                "查询业务虚拟交换机详情",
+                tr("deploy.config_cluster.action_query_biz_vds_detail"),
                 results,
             )
             detail_entry = results[-1]
@@ -376,12 +377,12 @@ def run_config_cluster_stage(ctx_dict):
                 expected_count = len(business_network_payloads)
                 if actual_vlans_count is None:
                     stage_logger.warning(
-                        "业务虚拟交换机详情未返回vlans_count字段，请人工确认业务网络是否创建成功",
+                        tr("deploy.config_cluster.biz_vds_missing_vlan_count"),
                         progress_extra={"expected": expected_count},
                     )
                 elif actual_vlans_count != expected_count:
                     stage_logger.warning(
-                        "业务虚拟网络数量与规划表不一致，请人工确认",
+                        tr("deploy.config_cluster.biz_network_count_mismatch"),
                         progress_extra={
                             "expected": expected_count,
                             "actual": actual_vlans_count,
@@ -390,7 +391,7 @@ def run_config_cluster_stage(ctx_dict):
                     )
                 else:
                     stage_logger.info(
-                        "业务虚拟网络数量校验通过",
+                        tr("deploy.config_cluster.biz_network_count_ok"),
                         progress_extra={
                             "expected": expected_count,
                             "actual": actual_vlans_count,
@@ -398,7 +399,7 @@ def run_config_cluster_stage(ctx_dict):
                         },
                     )
         else:
-            stage_logger.info("规划表未提供业务虚拟网络配置，跳过创建业务虚拟网络")
+            stage_logger.info(tr("deploy.config_cluster.biz_network_missing_skip"))
 
     # === 7. 批量更新主机账号密码 ===
     password_summary = _update_host_login_passwords(stage_logger, host_entries, cfg)
@@ -425,13 +426,13 @@ def run_config_cluster_stage(ctx_dict):
     )
 
     # === 10. 获取并回填集群序列号 ===
-    stage_logger.info("正在获取集群序列号")
-    license_resp = _fetch_json_response(client, "/api/v2/tools/license", auth_headers, "获取集群序列号", results)
+    stage_logger.info(tr("deploy.config_cluster.serial_fetch_start"))
+    license_resp = _fetch_json_response(client, "/api/v2/tools/license", auth_headers, tr("deploy.config_cluster.action_fetch_serial"), results)
     license_entry = results[-1]
     serial = _extract_cluster_serial(license_resp)
     if license_entry.get("status") == "ok" and serial:
         ctx.extra.setdefault('cluster', {})['serial'] = serial
-        stage_logger.info(f"已获取集群序列号: {serial}")
+        stage_logger.info(tr("deploy.config_cluster.serial_fetch_done", serial=serial))
         stage_logger.debug(
             "序列号响应体摘要",
             progress_extra={
@@ -445,23 +446,23 @@ def run_config_cluster_stage(ctx_dict):
             try:
                 _write_cluster_serial_to_plan(plan_path, serial)
                 results.append({"action": "write_plan_serial", "status": "ok", "path": str(plan_path)})
-                stage_logger.info(f"已在规划表写入集群序列号[{plan_path.name}]")
+                stage_logger.info(tr("deploy.config_cluster.serial_write_plan_done", plan=plan_path.name))
             except Exception as exc:  # noqa: BLE001 - 记录失败
                 logger.debug("写入集群序列号到规划表失败详情", exc_info=exc)
                 results.append({"action": "write_plan_serial", "status": "failed", "error": str(exc)})
-                stage_logger.warning(f"写入集群序列号到规划表失败: {exc}")
+                stage_logger.error(tr("deploy.config_cluster.serial_write_plan_fail", error=exc))
         else:
-            stage_logger.warning("未找到规划表路径，序列号仅保存于运行上下文")
+            stage_logger.warning(tr("deploy.config_cluster.serial_plan_path_missing"))
     elif license_entry.get("status") == "ok":
-        warning_msg = "未能解析到集群序列号，请人工确认"
+        warning_msg = tr("deploy.config_cluster.serial_parse_missing")
         stage_logger.warning(warning_msg)
         results.append({"action": "解析集群序列号", "status": "warning", "error": warning_msg})
     else:
-        stage_logger.warning("未能获取集群序列号")
+        stage_logger.warning(tr("deploy.config_cluster.serial_fetch_missing"))
 
     # === 11. 持久化阶段执行明细到运行上下文 ===
     ctx.extra.setdefault('config_cluster', {})['results'] = results
-    stage_logger.info("集群配置阶段完成")
+    stage_logger.info(tr("deploy.config_cluster.stage_done"))
 
 
 def _is_deployment_successful(verify_result: Any) -> bool:
@@ -486,7 +487,7 @@ def _send_post_request(
         results.append({"action": description, "status": "ok"})
         return response
     except APIError as exc:
-        logger.warning("%s失败: %s", description, exc)
+        logger.error("%s失败: %s", description, exc)
         results.append(
             {
                 "action": description,
@@ -520,7 +521,7 @@ def _send_put_request(
         results.append({"action": description, "status": "ok"})
         return response
     except APIError as exc:
-        logger.warning("%s失败: %s", description, exc)
+        logger.error("%s失败: %s", description, exc)
         results.append({"action": description, "status": "warning", "error": str(exc)})
         return {}
     except Exception as exc:  # noqa: BLE001
@@ -541,7 +542,7 @@ def _fetch_json_response(
         results.append({"action": description, "status": "ok"})
         return response
     except APIError as exc:
-        logger.warning("%s失败: %s", description, exc)
+        logger.error("%s失败: %s", description, exc)
         results.append({"action": description, "status": "warning", "error": str(exc)})
         return {}
     except Exception as exc:  # noqa: BLE001
@@ -941,7 +942,7 @@ def _update_host_login_passwords(stage_logger, host_entries: List[Dict[str, Any]
         host_cfg = cfg.get('host_password_update', {}) or {}
 
     if isinstance(host_cfg, dict) and host_cfg.get('enabled') is False:
-        stage_logger.info("配置已禁用主机密码修改，跳过执行")
+        stage_logger.info(tr("deploy.config_cluster.password_update_disabled"))
         return {"action": "批量更新主机密码", "status": "skipped", "reason": "disabled"}
 
     DEFAULT_PASSWORD = "HC!r0cks"
@@ -956,7 +957,7 @@ def _update_host_login_passwords(stage_logger, host_entries: List[Dict[str, Any]
         login_user = host_cfg.get('login_user') or 'smartx'
         if str(login_user).lower() != 'smartx':
             stage_logger.warning(
-                "密码更新登录账号固定使用 smartx，已忽略自定义",
+                tr("deploy.config_cluster.password_login_user_forced"),
                 progress_extra={"host": mgmt_ip, "login_user": login_user},
             )
             login_user = 'smartx'
@@ -974,13 +975,13 @@ def _update_host_login_passwords(stage_logger, host_entries: List[Dict[str, Any]
 
     jobs = list(jobs_map.values())
     if not jobs:
-        stage_logger.warning("没有可用于更新密码的主机记录，跳过")
+        stage_logger.warning(tr("deploy.config_cluster.password_no_hosts"))
         return {"action": "批量更新主机密码", "status": "skipped", "reason": "no_hosts"}
 
     try:
         paramiko_module = importlib.import_module('paramiko')
     except ImportError as exc:  # pragma: no cover - runtime environment issue
-        stage_logger.warning("未安装 paramiko，无法执行主机密码更新: %s", exc)
+        stage_logger.warning(tr("deploy.config_cluster.password_missing_paramiko", error=exc))
         return {
             "action": "批量更新主机密码",
             "status": "failed",
@@ -990,9 +991,9 @@ def _update_host_login_passwords(stage_logger, host_entries: List[Dict[str, Any]
     max_workers = int(host_cfg.get('max_workers', min(4, len(jobs)))) or 1
     ssh_timeout = int(host_cfg.get('ssh_timeout', 30))
 
-    stage_logger.info("正在批量更新主机账号密码", progress_extra={"host_count": len(jobs), "max_workers": max_workers})
+    stage_logger.info(tr("deploy.config_cluster.password_update_start"), progress_extra={"host_count": len(jobs), "max_workers": max_workers})
     stage_logger.debug(
-        "主机密码更新任务摘要",
+        tr("deploy.config_cluster.password_jobs_summary"),
         progress_extra={
             "jobs": [
                 {
@@ -1022,14 +1023,14 @@ def _update_host_login_passwords(stage_logger, host_entries: List[Dict[str, Any]
             errors.append(str(result))
 
     if errors and success_hosts:
-        stage_logger.warning("部分主机密码更新失败", progress_extra={"failed": errors, "succeeded": success_hosts})
+        stage_logger.warning(tr("deploy.config_cluster.password_partial"), progress_extra={"failed": errors, "succeeded": success_hosts})
         status = "partial"
     elif errors:
         for err in errors:
-            stage_logger.error("主机密码更新失败: %s", err)
+            stage_logger.error(tr("deploy.config_cluster.password_failed", error=err))
         status = "failed"
     else:
-        stage_logger.info("全部主机密码更新成功", progress_extra={"hosts": success_hosts})
+        stage_logger.info(tr("deploy.config_cluster.password_success"), progress_extra={"hosts": success_hosts})
         status = "ok"
 
     summary: Dict[str, Any] = {
@@ -1117,13 +1118,13 @@ def _upload_svt_image(
     svt_cfg = cfg_dict.get('svt', {}) if isinstance(cfg_dict, dict) else {}
 
     if isinstance(svt_cfg, dict) and svt_cfg.get('enabled') is False:
-        stage_logger.info("配置已禁用 SVT 上传，跳过")
+        stage_logger.info(tr("deploy.config_cluster.svt_upload_disabled"))
         return {"action": "上传SVT镜像", "status": "skipped", "reason": "disabled"}
 
     iso_path = _resolve_svt_iso_path(ctx, svt_cfg)
     if iso_path is None:
         stage_logger.warning(
-            "未找到 SVT 镜像文件，跳过上传",
+            tr("deploy.config_cluster.svt_not_found"),
             progress_extra={"glob": (svt_cfg.get('iso_glob') if isinstance(svt_cfg, dict) else None)},
         )
         return {"action": "上传SVT镜像", "status": "skipped", "reason": "not_found"}
@@ -1131,7 +1132,7 @@ def _upload_svt_image(
     iso_size = iso_path.stat().st_size
     if iso_size <= 0:
         stage_logger.warning(
-            "SVT 镜像为空，跳过上传",
+            tr("deploy.config_cluster.svt_empty"),
             progress_extra={"path": str(iso_path)},
         )
         return {"action": "上传SVT镜像", "status": "skipped", "reason": "empty_file"}
@@ -1146,7 +1147,7 @@ def _upload_svt_image(
                 verify=getattr(client, "verify", True),
             )
             stage_logger.debug(
-                "SVT 上传优先使用集群 VIP",
+                tr("deploy.config_cluster.svt_use_vip"),
                 progress_extra={"base_url": upload_client.base_url},
             )
         except Exception as exc:  # noqa: BLE001 - 回退到现有客户端
@@ -1230,7 +1231,7 @@ def _configure_cpu_compatibility(
     results: List[Dict[str, Any]],
 ) -> None:
     try:
-        stage_logger.info("正在查询推荐 CPU 兼容性")
+        stage_logger.info(tr("deploy.config_cluster.cpu_compat_query"))
         recommend_resp = _fetch_json_response(
             client,
             "/api/v2/elf/cluster_recommended_cpu_models",
@@ -1246,7 +1247,7 @@ def _configure_cpu_compatibility(
             return
 
         payload = {"cpu_model": model}
-        stage_logger.info("正在配置 CPU 兼容性", progress_extra={"cpu_model": model})
+        stage_logger.info(tr("deploy.config_cluster.cpu_compat_config"), progress_extra={"cpu_model": model})
         _send_put_request(
             client,
             "/api/v2/elf/cluster_cpu_compatibility",
@@ -1511,7 +1512,7 @@ def _cleanup_svt_image(client: APIClient, headers: Dict[str, str], image_uuid: s
         return
     try:
         client.delete(f"/api/v2/images/{image_uuid}", headers=headers)
-        stage_logger.warning("已回滚 SVT 上传卷", progress_extra={"image_uuid": image_uuid})
+        stage_logger.warning(tr("deploy.config_cluster.svt_rollback"), progress_extra={"image_uuid": image_uuid})
     except Exception as exc:  # noqa: BLE001
         stage_logger.warning(
             "清理 SVT 上传卷失败",

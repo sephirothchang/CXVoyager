@@ -24,6 +24,7 @@ from threading import Event
 from typing import Any, Callable, Dict, Iterable, List, Sequence
 
 from cxvoyager.common.config import Config, load_config
+from cxvoyager.common.i18n import tr
 from cxvoyager.common.system_constants import DEFAULT_CONFIG_FILE
 from cxvoyager.common.logging_config import setup_logging
 from cxvoyager.core.deployment.runtime_context import RunContext
@@ -118,9 +119,9 @@ def execute_run(
     setup_logging(effective.log_level)
 
     stage_names = [stage.value if isinstance(stage, Stage) else str(stage) for stage in stages]
-    logger.info("加载配置文件: %s", DEFAULT_CONFIG_FILE)
-    logger.info("执行阶段: %s", stage_names)
-    logger.info("运行参数: %s", effective.to_dict())
+    logger.info(tr("deploy.executor.load_config", path=DEFAULT_CONFIG_FILE))
+    logger.info(tr("deploy.executor.stages", stages=stage_names))
+    logger.info(tr("deploy.executor.options", options=effective.to_dict()))
 
     ctx = RunContext(config=cfg)
     ctx.extra.setdefault("cli_options", {})
@@ -179,11 +180,13 @@ def _resolve_effective_options(cfg: Config, options: RunOptions | None) -> Effec
     )
 
     logger.debug(
-        "解析运行参数: dry_run=%s strict_validation=%s debug=%s log_level=%s",
-        resolved.dry_run,
-        resolved.strict_validation,
-        resolved.debug,
-        resolved.log_level,
+        tr(
+            "deploy.executor.resolve_options",
+            dry_run=resolved.dry_run,
+            strict_validation=resolved.strict_validation,
+            debug=resolved.debug,
+            log_level=resolved.log_level,
+        )
     )
     return resolved
 

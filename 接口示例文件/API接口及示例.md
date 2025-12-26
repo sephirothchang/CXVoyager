@@ -2679,6 +2679,31 @@ x-smartx-token：d513e36581044eb691ba9589eebac995
     }
 }
 
+  ### 修改OBS NTP配置
+
+  请求网址
+  https://10.0.20.2/api
+  请求方法
+  POST
+
+  header
+  cookie
+  path=/; path=/; connect.sid=s%3Acmjkynw9e024p7zud58mscdx7.Lo9ABrnF3eWB3z7TZFin51N2%2Bz9vdi4qq7VmzhYPI7k
+
+  载荷（"ntp_service_url":"10.0.0.2,ntp.c89.fun,10.0.0.1"）来源于解析表的NTP服务器地址，"where":{"id":"cmjl61tvj0pdc0958uzrclg18"}中的id是obs实例ID，通过查询部署好的obs实例获取）
+  {"operationName":"updateObservabilityNtpUrl","variables":{"data":{"ntp_service_url":"10.0.0.2,ntp.c89.fun,10.0.0.1"},"where":{"id":"cmjl61tvj0pdc0958uzrclg18"}},"query":"mutation updateObservabilityNtpUrl($data: NtpCommonUpdateInput!, $where: BundleApplicationInstanceWhereUniqueInput!) {\n  updateObservabilityNtpUrl(data: $data, where: $where) {\n    ntp_service_url\n    __typename\n  }\n}\n"}
+
+  响应
+  {
+      "data": {
+          "updateObservabilityNtpUrl": {
+              "ntp_service_url": "10.0.0.2;ntp.c89.fun;10.0.0.1",
+              "__typename": "UpdateNtpCommonResult"
+          }
+      }
+  }
+
+
   ### 关联集群
 
   请求网址

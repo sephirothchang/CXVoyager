@@ -367,7 +367,7 @@ def parse_plan(file_path: Path) -> Dict[str, Any]:
     try:
         data["_derived_network"] = _build_derived_network(virtual_network_records)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("派生网络结构失败: %s", exc)
+        logger.warning("派生网络结构异常，使用已有数据继续: %s", exc)
 
     return data
 
@@ -404,8 +404,8 @@ def to_model(parsed: Dict[str, Any]) -> PlanModel:
         try:
             return MgmtInfo(**recs[0])
         except Exception as exc:  # noqa: BLE001
-            logger.warning("规划表 mgmt 区域转换失败，使用空管理信息继续", exc_info=exc)
-            return MgmtInfo()
+            logger.error("规划表 mgmt 区域转换失败，终止执行")
+            raise
 
     def _extract_storage_architecture() -> str | None:
         hosts_section = parsed.get("hosts", {})

@@ -31,6 +31,7 @@ from cxvoyager.common.system_constants import DEFAULT_CONFIG_FILE
 from cxvoyager.integrations.smartx.api_client import APIClient, APIError
 from cxvoyager.models.planning_sheet_models import PlanModel
 from cxvoyager.common.parallel_utils import parallel_map
+from cxvoyager.common.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -133,27 +134,27 @@ def _validate_host_data(data: dict, required_ifaces: Dict[str, Set[str]] | None 
         host_data = data
 
     if not isinstance(host_data, dict):
-        msg = "扫描响应格式无效"
+        msg = tr("deploy.host_scan.invalid_response_format")
         logger.warning(msg)
         return False, [msg]
 
     required_fields = ["host_ip", "host_uuid", "hostname", "ifaces", "disks"]
     for field in required_fields:
         if field not in host_data or host_data[field] is None:
-            msg = f"缺少必需字段: {field}"
+            msg = tr("deploy.host_scan.missing_field", field=field)
             logger.warning(msg)
             errors.append(msg)
 
     host_uuid = host_data.get("host_uuid", "")
     if not isinstance(host_uuid, str) or len(host_uuid) < 32:
-        msg = f"host_uuid 格式无效: {host_uuid}"
+        msg = tr("deploy.host_scan.invalid_host_uuid", host_uuid=host_uuid)
         logger.warning(msg)
         errors.append(msg)
 
     ifaces = host_data.get("ifaces", [])
     available_nics: Set[str] = set()
     if not isinstance(ifaces, list) or len(ifaces) == 0:
-        msg = "网卡数据为空或格式无效"
+        msg = tr("deploy.host_scan.iface_data_invalid")
         logger.warning(msg)
         errors.append(msg)
         ifaces = []
@@ -164,7 +165,7 @@ def _validate_host_data(data: dict, required_ifaces: Dict[str, Set[str]] | None 
         required_iface_fields = ["name", "hwaddr"]
         missing_fields = [f for f in required_iface_fields if not iface.get(f)]
         if missing_fields:
-            msg = f"网卡缺少必需字段 {','.join(missing_fields)}: {iface}"
+            msg = tr("deploy.host_scan.iface_missing_fields", missing=", ".join(missing_fields), iface=iface)
             logger.warning(msg)
             errors.append(msg)
         iface_name = iface.get("name")
@@ -177,13 +178,13 @@ def _validate_host_data(data: dict, required_ifaces: Dict[str, Set[str]] | None 
         missing = [name for name in expected if _normalize_iface_name(name) not in available_nics]
         if missing:
             label = ROLE_LABELS.get(role, f"{role} 网卡")
-            msg = f"{label}缺少: {', '.join(sorted(missing))}"
+            msg = tr("deploy.host_scan.required_ifaces_missing", label=label, missing=", ".join(sorted(missing)))
             logger.warning(msg)
             errors.append(msg)
 
     disks_raw = host_data.get("disks", [])
     if not isinstance(disks_raw, list) or len(disks_raw) == 0:
-        msg = "磁盘数据为空或格式无效"
+        msg = tr("deploy.host_scan.disk_data_invalid")
         logger.warning(msg)
         errors.append(msg)
         disks = disks_raw if isinstance(disks_raw, list) else []
@@ -197,31 +198,31 @@ def _validate_host_data(data: dict, required_ifaces: Dict[str, Set[str]] | None 
         required_disk_fields = ["drive", "function", "model", "serial", "size", "type"]
         for field in required_disk_fields:
             if field not in disk or disk[field] is None:
-                msg = f"磁盘缺少必需字段 {field}: {disk}"
+                msg = tr("deploy.host_scan.disk_missing_field", field=field, disk=disk)
                 logger.warning(msg)
                 errors.append(msg)
         size = disk.get("size")
         if not isinstance(size, (int, float)) or size <= 0:
-            msg = f"磁盘大小无效: {disk}"
+            msg = tr("deploy.host_scan.disk_invalid_size", disk=disk)
             logger.warning(msg)
             errors.append(msg)
         disk_type = disk.get("type")
         if disk_type not in ["SSD", "HDD"]:
-            msg = f"磁盘类型无效: {disk_type}"
+            msg = tr("deploy.host_scan.disk_invalid_type", disk_type=disk_type)
             logger.warning(msg)
             errors.append(msg)
         if disk.get("function") in ["boot", "system"]:
             has_boot_disk = True
 
     if disks and not has_boot_disk:
-        msg = "未找到引导磁盘"
+        msg = tr("deploy.host_scan.missing_boot_disk")
         logger.warning(msg)
         errors.append(msg)
 
     optional_fields = ["sn", "product", "version", "status"]
     for field in optional_fields:
         if field in host_data and not isinstance(host_data[field], str):
-            logger.warning("字段 %s 应为字符串类型: %s", field, type(host_data[field]))
+            logger.warning(tr("deploy.host_scan.field_should_be_str", field=field, type=type(host_data[field])))
 
     if errors:
         return False, errors
@@ -249,25 +250,25 @@ def _scan_single_host(
     if token:
         headers["x-smartx-token"] = token
 
-    logger.debug("开始扫描主机 %s via %s", mgmt_ip, base_url)
+    logger.debug(tr("deploy.host_scan.start_scan", ip=mgmt_ip, base_url=base_url))
     
     # 重试逻辑
     last_exception: Exception | None = None
     for attempt in range(1, max_retries + 1):
         try:
-            logger.debug("扫描主机 %s - 第 %d 次尝试", mgmt_ip, attempt)
+            logger.debug(tr("deploy.host_scan.retry_scan", ip=mgmt_ip, attempt=attempt))
             data = client.get("/api/v2/deployment/host", headers=headers)
             
             if not isinstance(data, dict):
                 raise RuntimeError(f"扫描 {mgmt_ip} 返回的不是 JSON 对象")
             
             # debug级别记录完整的JSON响应
-            logger.debug("主机 %s 扫描响应: %s", mgmt_ip, json.dumps(data, ensure_ascii=False, indent=2))
+            logger.debug(tr("deploy.host_scan.response_debug", ip=mgmt_ip, payload=json.dumps(data, ensure_ascii=False, indent=2)))
             
             # 验证数据完整性
             valid, validation_errors = _validate_host_data(data, required_ifaces=required_ifaces)
             if valid:
-                logger.info("主机 %s 扫描成功，数据完整", mgmt_ip)
+                logger.info(tr("deploy.host_scan.scan_success", ip=mgmt_ip))
                 # 如果数据结构有data字段，需要提取出来
                 if "data" in data and isinstance(data["data"], dict):
                     return mgmt_ip, data["data"]
@@ -275,12 +276,7 @@ def _scan_single_host(
                     return mgmt_ip, data
             else:
                 detail = "；".join(validation_errors) if validation_errors else "数据验证失败"
-                logger.warning(
-                    "主机 %s 第 %d 次扫描数据验证失败: %s",
-                    mgmt_ip,
-                    attempt,
-                    detail,
-                )
+                logger.warning(tr("deploy.host_scan.validation_failed_attempt", ip=mgmt_ip, attempt=attempt, detail=detail))
                 if attempt < max_retries:
                     time.sleep(1)  # 等待1秒后重试
                     continue
@@ -293,19 +289,9 @@ def _scan_single_host(
 
             message = str(root_exc)
             if isinstance(root_exc, APIError):
-                logger.warning(
-                    "主机 %s 第 %d 次扫描失败 (API): %s",
-                    mgmt_ip,
-                    attempt,
-                    message,
-                )
+                logger.warning(tr("deploy.host_scan.api_retry_fail", ip=mgmt_ip, attempt=attempt, error=message))
             else:
-                logger.warning(
-                    "主机 %s 第 %d 次扫描失败: %s",
-                    mgmt_ip,
-                    attempt,
-                    message,
-                )
+                logger.warning(tr("deploy.host_scan.retry_fail", ip=mgmt_ip, attempt=attempt, error=message))
             if attempt < max_retries:
                 time.sleep(1)  # 等待1秒后重试
                 continue
@@ -313,17 +299,14 @@ def _scan_single_host(
                 break
     
     # 所有重试都失败了
-    error_msg = f"主机 {mgmt_ip} 经过 {max_retries} 次重试后仍然失败"
+    error_msg = tr("deploy.host_scan.final_error", ip=mgmt_ip, retries=max_retries)
     if last_exception:
         error_detail = str(last_exception)
         if error_detail:
             error_msg += f": {error_detail}"
 
         if _is_auth_failure(last_exception):
-            error_msg += (
-                "。接口返回鉴权失败，请确认配置了有效的 SmartX API Token —— "
-                "可在配置文件 api.x-smartx-token 中设置，或通过环境变量 CXVOYAGER_API_TOKEN / SMARTX_TOKEN 提供。"
-            )
+            error_msg += " " + tr("deploy.host_scan.auth_hint")
     raise RuntimeError(error_msg)
 
 
@@ -402,13 +385,17 @@ def scan_hosts(
                 required_ifaces=required_ifaces,
             )
         except Exception as exc:  # noqa: BLE001 - surface to aggregator
-            message = f"扫描 {host.SMTX主机名 or host.管理地址 or '?'} 失败: {exc}"
+            message = tr(
+                "deploy.host_scan.worker_failure",
+                host=host.SMTX主机名 or host.管理地址 or "?",
+                error=exc,
+            )
             logger.warning(message)
             return RuntimeError(message)
 
     for outcome in parallel_map(_worker, model.hosts, max_workers=worker_count):
         if isinstance(outcome, Exception):
-            logger.warning("主机扫描失败: %s", outcome)
+            logger.warning(tr("deploy.host_scan.aggregate_failure", error=outcome))
             warnings.append(str(outcome))
             continue
         host_ip, payload = outcome

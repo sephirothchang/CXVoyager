@@ -281,7 +281,7 @@ class TaskManager:
             with self._storage_path.open("r", encoding="utf-8") as fh:
                 raw_tasks = json.load(fh)
         except (OSError, json.JSONDecodeError) as exc:
-            logger.warning("加载任务存档失败: %s", exc)
+            logger.warning("加载任务存档异常，已跳过历史任务: %s", exc)
             return
         dirty = False
         with self._lock:
