@@ -1,0 +1,152 @@
+logging:
+  # 被 `process/workflow/deployment_executor.py` 的 `_resolve_effective_options` 读取，用于决定默认日志级别。
+  level: debug
+  # 同样在 `_resolve_effective_options` 中使用，影响 CLI 解析出的 debug 模式并最终决定日志级别。
+  debug: true
+
+api:
+  # 由 `process/workflow/handlers/init_cluster.py` 与部署阶段（deploy_obs/deploy_bak/...）传给 `integrations.smartx.api_client.APIClient`，覆盖 SmartX API 的基址。
+  base_url:
+  # `init_cluster` 若启用 mock 将转向 `utils.mock_scan_host`，部署阶段仅保留 dry-run（无 mock）。
+  mock: false
+  # SmartX 鉴权令牌，`init_cluster`/各 deploy_* 阶段/`process/workflow/host_discovery_scanner.py` 在请求头中使用；`library/common/config/__init__.py` 会保证该键存在。
+  x-smartx-token: "e79b85fc18b7402fbcc0391fe8d7d24c"
+  # 初始化集群前使用的固定鉴权令牌，适用于扫描/部署 API。
+  default-x-smartx-token: "e79b85fc18b7402fbcc0391fe8d7d24c"
+  # REST 调用超时，传入 `APIClient`（见 `init_cluster` 和各 deploy_* 阶段）。
+  timeout: 10
+
+precheck:
+  # IP 预检通用并发设置
+  concurrency: 8
+  mgmt:
+    timeout: 2
+    retries: 0
+    ports: [80, 443, 22]
+  vip_probe:
+    timeout: 1
+    retries: 0
+    ports: []
+  storage_probe:
+    timeout: 1
+    retries: 0
+    ports: []
+  cloudtower_probe:
+    timeout: 3
+    retries: 0
+    verify_ssl: false
+  bmc_probe:
+    timeout: 2
+    retries: 0
+    port: 623
+
+validation:
+  # `prepare` 阶段与 `_resolve_effective_options` 共同使用，决定规划表校验是否以严格模式运行。
+  strict: false
+
+deploy:
+  # 初始 dry-run 默认值，`deployment_executor` 用于合成 CLI 选项，各 deploy_* 阶段用来决定是否提交真实上传。
+  dry_run: false
+
+  # 下面两个选项由各 deploy_* 阶段和 `process/workflow/handlers/init_cluster.py`
+  # 共同读取，用于控制主机部署进度查询的最大次数和超时时间。
+  # 例如当前默认配置为 10 秒间隔，450 次查询，则最长等待时间为 4500 秒（约 75 分钟）。
+  # 部署状态轮询的等待间隔，在初始化集群阶段时，被用于控制查询频率。
+  poll_interval: 5
+  # 最大轮询次数，在初始化集群阶段和部署 CLI 中共同用于判定超时。
+  max_attempts: 720
+
+cloudtower:
+  # CloudTower ISO 上传默认配置，可按需在本地配置文件覆盖。
+  # ISO 文件路径，留空则使用 glob 模式查找。
+  iso_path: ""
+  # ISO 文件名 glob 模式，默认为 "cloudtower*.iso"。
+  iso_glob: "cloudtower*.iso"
+  # ISO 文件上传设备，默认为 "nfs"。
+  upload_device: "nfs"
+  upload_os: ""
+  # ISO 文件描述信息，默认为cloudtower。
+  description: "cloudtower os image"
+  # chunk 分片的默认大小，单位字节。默认为 8 MiB。
+  chunk_size_fallback: 8388608
+  # 阶段 06 CloudTower 集群配置开关。
+  stage06:
+    storage_policy:
+      # 是否自动更新默认存储策略。
+      enabled: true
+      # 存储策略名称，REPLICA_2_THIN_PROVISION 表示双副本精简配置。
+      name: "default"
+      # 副本数量，双副本为 2。
+      replica_num: 2
+      # 是否启用精简配置。
+      thin_provision: true
+    alert_threshold:
+      # 是否根据主机数量自动计算存储容量的 NOTICE 告警阈值。
+      enabled: false
+      # 告警规则名称，默认针对 zbs_cluster_data_space_use_rate。
+      name: "zbs_cluster_data_space_use_rate"
+      # CRITICAL 告警阈值百分比。
+      critical_threshold: 90
+      # NOTICE 阈值的下限百分比，防止计算结果过低。
+      notice_floor: 60
+    password_rotation:
+      # 是否批量修改物理主机 root/smartx 密码。
+      enabled: true
+      # 需要同步密码的用户名列表。
+      users:
+        - root
+        - smartx
+      # 用于登陆执行修改的账号与密码。
+      login_user: "smartx"
+      login_password: "HC!r0cks"
+      # SSH 端口，默认 22。
+      port: 22
+  # 阶段 08 CloudTower 巡检任务默认配置。
+  stage08:
+    # 是否执行巡检任务。
+    enabled: true
+    # 巡检中心 Job 使用的版本号。
+    version: "1.1.1-rc.11"
+    # 巡检报告导出格式，支持 word/pdf。
+    export_format: "word"
+    # 生成指标图表的回溯月份。
+    graph_duration_months: 6
+    # 导出轮询的时间间隔（秒）。
+    poll_interval: 5
+    # 导出轮询的超时时间（秒）。
+    poll_timeout: 600
+    # 如果留空则回退到工作目录下 artifacts 目录。
+    download_dir: ""
+    # 可选的自定义巡检项列表，留空使用默认值。
+    user_defined_items: []
+
+svt:
+  # VMTools/SVT 镜像上传默认配置。
+  enabled: true
+  # 本地镜像路径，留空则按 glob 规则搜索。
+  iso_path: ""
+  # 镜像匹配规则，默认查找 SMTX_VMTOOLS-*.iso。
+  iso_glob: "SMTX_VMTOOLS-*.iso"
+  # 若接口未返回 chunk_size 时的回退值（字节）。
+  chunk_size_fallback: 8388608
+
+host_scan:
+  # 主机存活探测的默认 HTTP 超时和重试次数。
+  # 由 `process/workflow/host_discovery_scanner.py` 与 `handlers/init_cluster.py`
+  # 共同读取，用于访问各主机的部署 API。
+  timeout: 10
+  max_retries: 3
+
+web:
+  # Web 控制台向导缺省行为配置。
+  defaults:
+    # 默认勾选的阶段组合，供 UI 与 RunRequestModel 共同读取。
+    stages:
+      - prepare
+      - init_cluster
+      - config_cluster
+    # Web 端勾选框初始值，与 `deploy`/`validation` 段落保持一致。
+    run_options:
+      dry_run: false
+      strict_validation: false
+      debug: false

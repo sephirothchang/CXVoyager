@@ -51,7 +51,7 @@ def _prompt_choice(prompt: str | None = None) -> str:
 
 
 def _run_cli_shell() -> None:
-    from cxvoyager.interfaces.cli.app import app as cli_app
+    from cxvoyager.resources.interfaces.cli.app import app as cli_app
 
     def invoke_cli(args: list[str]) -> None:
         try:
@@ -134,7 +134,7 @@ def _run_web_ui() -> None:
     print(_t("按 Ctrl+C 停止服务。", "Press Ctrl+C to stop."))
     try:
         uvicorn.run(
-            "cxvoyager.interfaces.web.web_server:app",
+            "cxvoyager.resources.interfaces.web.web_server:app",
             host=host,
             port=port,
             log_level="info",
@@ -146,7 +146,7 @@ def _run_web_ui() -> None:
 
 def _install_offline_dependencies() -> None:
     project_root = Path(__file__).resolve().parent
-    offline_dir = project_root / "cxvoyager" / "common" / "resources" / "offline_packages"
+    offline_dir = project_root / "cxvoyager" / "resources" / "offline_packages"
     requirements_file = project_root / "requirements.txt"
 
     if not offline_dir.exists():
@@ -227,4 +227,3 @@ def main() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
-

@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="$SCRIPT_DIR/.venv"
 VENV_PYTHON="$VENV_DIR/bin/python"
 REQ_FILE="$SCRIPT_DIR/requirements.txt"
-OFFLINE_DIR="$SCRIPT_DIR/cxvoyager/common/resources/offline_packages"
+OFFLINE_DIR="$SCRIPT_DIR/cxvoyager/resources/offline_packages"
 REQ_STAMP="$VENV_DIR/.requirements.sha256"
 
 install_requirements() {

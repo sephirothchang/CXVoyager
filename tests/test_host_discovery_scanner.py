@@ -2,8 +2,8 @@ from ipaddress import ip_address
 
 import pytest
 
-from cxvoyager.core.deployment import host_discovery_scanner as scanner
-from cxvoyager.models.planning_sheet_models import HostRow, PlanModel, VirtualNetworkRow
+from cxvoyager.process.workflow import host_discovery_scanner as scanner
+from cxvoyager.library.models.planning_sheet_models import HostRow, PlanModel, VirtualNetworkRow
 
 
 class DummyHost:

@@ -23,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 REQUIREMENTS = ROOT / "requirements.txt"
-OFFLINE_DIR = ROOT / "cxvoyager" / "common" / "resources" / "offline_packages"
+OFFLINE_DIR = ROOT / "cxvoyager" / "resources" / "offline_packages"
 
 
 def ensure_offline_dir() -> None:
@@ -53,4 +53,3 @@ def download() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     download()
-

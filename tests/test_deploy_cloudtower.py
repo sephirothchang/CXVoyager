@@ -6,13 +6,13 @@ from threading import Event
 
 import pytest
 
-from cxvoyager.core.deployment.handlers import deploy_cloudtower
-from cxvoyager.core.deployment.runtime_context import RunContext
-from cxvoyager.core.deployment.stage_manager import AbortRequestedError
-from cxvoyager.integrations.smartx.api_client import APIError
-from cxvoyager.models import PlanModel
-from cxvoyager.common.config import Config
-from cxvoyager.core.deployment.progress import PROGRESS_MESSAGES_KEY
+from cxvoyager.process.handlers import deploy_cloudtower
+from cxvoyager.process.workflow.runtime_context import RunContext
+from cxvoyager.process.workflow.stage_manager import AbortRequestedError
+from cxvoyager.library.integrations.smartx.api_client import APIError
+from cxvoyager.library.models import PlanModel
+from cxvoyager.library.common.config import Config
+from cxvoyager.process.workflow.progress import PROGRESS_MESSAGES_KEY
 
 
 class _BaseDummyClient:
@@ -358,7 +358,7 @@ def test_deploy_cloudtower_accepts_flat_volume_response(tmp_path, monkeypatch, c
         return client
 
     monkeypatch.setattr(deploy_cloudtower, "APIClient", client_factory)
-    caplog.set_level(logging.DEBUG, logger="cxvoyager.core.deployment.handlers.deploy_cloudtower")
+    caplog.set_level(logging.DEBUG, logger="cxvoyager.process.handlers.deploy_cloudtower")
 
     ctx = _build_context(tmp_path, iso_path.name)
     deploy_cloudtower.handle_deploy_cloudtower({"ctx": ctx})

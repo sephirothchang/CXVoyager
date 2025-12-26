@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:  # Ensure project root is importable when run directly
     sys.path.insert(0, str(ROOT))
 
-from cxvoyager.integrations.excel.planning_sheet_parser import find_plan_file, parse_plan, to_model
+from cxvoyager.library.integrations.excel.planning_sheet_parser import find_plan_file, parse_plan, to_model
 
 
 def _stringify(obj: Any) -> Any:

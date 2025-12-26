@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import pytest
 
-from cxvoyager.core.deployment.handlers import attach_cluster
-from cxvoyager.core.deployment.runtime_context import RunContext
-from cxvoyager.models import PlanModel
+from cxvoyager.process.handlers import attach_cluster
+from cxvoyager.process.workflow.runtime_context import RunContext
+from cxvoyager.library.models import PlanModel
 
 
 class _ClientRecorder:

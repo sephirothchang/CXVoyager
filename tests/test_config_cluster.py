@@ -9,11 +9,11 @@ from typing import Any
 import openpyxl
 import pytest
 
-from cxvoyager.common.config import Config
-from cxvoyager.core.deployment.handlers import config_cluster
-from cxvoyager.core.deployment.runtime_context import RunContext
-from cxvoyager.integrations.excel import field_variables as plan_vars
-from cxvoyager.models.planning_sheet_models import HostRow, PlanModel
+from cxvoyager.library.common.config import Config
+from cxvoyager.process.handlers import config_cluster
+from cxvoyager.process.workflow.runtime_context import RunContext
+from cxvoyager.library.integrations.excel import field_variables as plan_vars
+from cxvoyager.library.models.planning_sheet_models import HostRow, PlanModel
 
 
 class DummyClient:

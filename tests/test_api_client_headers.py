@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import pytest
 
-from cxvoyager.integrations.smartx.api_client import APIClient
+from cxvoyager.library.integrations.smartx.api_client import APIClient
 
 
 def test_api_client_mock_injects_host_header():

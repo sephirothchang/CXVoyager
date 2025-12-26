@@ -17,10 +17,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from cxvoyager.integrations.excel.planning_sheet_parser import parse_plan, to_model
-from cxvoyager.core.deployment.payload_builder import generate_deployment_payload
-from cxvoyager.core.deployment.host_discovery_scanner import scan_hosts
-from cxvoyager.common.mock_scan_host import mock_scan_host
+from cxvoyager.library.integrations.excel.planning_sheet_parser import parse_plan, to_model
+from cxvoyager.process.workflow.payload_builder import generate_deployment_payload
+from cxvoyager.process.workflow.host_discovery_scanner import scan_hosts
+from cxvoyager.utils.mock_scan_host import mock_scan_host
 
 
 def load_example_payload() -> dict:

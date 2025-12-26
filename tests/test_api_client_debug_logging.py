@@ -3,7 +3,7 @@ import logging
 import pytest
 from tenacity import RetryError
 
-from cxvoyager.integrations.smartx.api_client import APIClient, APIError
+from cxvoyager.library.integrations.smartx.api_client import APIClient, APIError
 
 
 class DummyResponse:
@@ -29,7 +29,7 @@ def test_post_logs_debug_information(caplog, monkeypatch, status):
 
     monkeypatch.setattr(client.session, "post", fake_post)
 
-    caplog.set_level(logging.DEBUG, logger="cxvoyager.integrations.smartx.api_client")
+    caplog.set_level(logging.DEBUG, logger="cxvoyager.library.integrations.smartx.api_client")
 
     headers = {"X-SMARTX-TOKEN": "secret-token"}
 

@@ -6,10 +6,10 @@ from typing import Any
 
 import pytest
 
-from cxvoyager.core.deployment.handlers import config_cluster
-from cxvoyager.core.deployment.progress import PROGRESS_MESSAGES_KEY, create_stage_progress_logger
-from cxvoyager.core.deployment.runtime_context import RunContext
-from cxvoyager.core.deployment.stage_manager import Stage
+from cxvoyager.process.handlers import config_cluster
+from cxvoyager.process.workflow.progress import PROGRESS_MESSAGES_KEY, create_stage_progress_logger
+from cxvoyager.process.workflow.runtime_context import RunContext
+from cxvoyager.process.workflow.stage_manager import Stage
 
 
 @pytest.fixture()

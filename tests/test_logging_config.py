@@ -1,6 +1,6 @@
 import logging
 
-from cxvoyager.common import logging_config
+from cxvoyager.library.common import logging_config
 
 
 def test_setup_logging_updates_level(tmp_path, monkeypatch):

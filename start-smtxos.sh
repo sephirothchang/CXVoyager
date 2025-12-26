@@ -4,13 +4,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PY_PORTABLE_DIR="$SCRIPT_DIR/smtxos-python"
 PY_PORTABLE="$PY_PORTABLE_DIR/bin/python"
-PY_PORTABLE_SRC_DIR="$SCRIPT_DIR/cxvoyager/common/resources/python-smtxos"
+PY_PORTABLE_SRC_DIR="$SCRIPT_DIR/cxvoyager/resources/python-smtxos"
 VENV_DIR="$SCRIPT_DIR/.venv-smtxos"
 VENV_PYTHON="$VENV_DIR/bin/python"
 REQ_FILE="$SCRIPT_DIR/requirements.txt"
-OFFLINE_DIR="$SCRIPT_DIR/cxvoyager/common/resources/offline_packages"
+OFFLINE_DIR="$SCRIPT_DIR/cxvoyager/resources/offline_packages"
 REQ_STAMP="$VENV_DIR/.requirements.sha256"
-FONT_SRC="$SCRIPT_DIR/cxvoyager/common/resources/fonts/SourceHanSansSC-Normal.otf"
+FONT_SRC="$SCRIPT_DIR/cxvoyager/resources/fonts/SourceHanSansSC-Normal.otf"
 FONT_DST_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/fonts"
 
 ensure_locale() {

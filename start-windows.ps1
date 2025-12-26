@@ -4,7 +4,7 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $venvDir = Join-Path $scriptDir ".venv"
 $pythonExe = Join-Path $venvDir "Scripts\python.exe"
 $reqFile = Join-Path $scriptDir "requirements.txt"
-$offlineDir = Join-Path $scriptDir "cxvoyager\common\resources\offline_packages"
+$offlineDir = Join-Path $scriptDir "cxvoyager\resources\offline_packages"
 $stampFile = Join-Path $venvDir ".requirements.sha256"
 
 function Install-Requirements {

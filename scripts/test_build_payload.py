@@ -39,11 +39,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from cxvoyager.common.config import load_config
-from cxvoyager.common.system_constants import DEFAULT_CONFIG_FILE
-from cxvoyager.integrations.excel.planning_sheet_parser import find_plan_file, parse_plan, to_model
-from cxvoyager.core.deployment.host_discovery_scanner import scan_hosts
-from cxvoyager.models import (
+from cxvoyager.library.common.config import load_config
+from cxvoyager.library.common.system_constants import DEFAULT_CONFIG_FILE
+from cxvoyager.library.integrations.excel.planning_sheet_parser import find_plan_file, parse_plan, to_model
+from cxvoyager.process.workflow.host_discovery_scanner import scan_hosts
+from cxvoyager.library.models import (
     ClusterDeployPayload,
     HostDeployPayload,
     HostDiskScan,
@@ -52,8 +52,8 @@ from cxvoyager.models import (
     VDS,
     VDSBond,
 )
-from cxvoyager.common.ip_utils import pick_prefer_ipv6
-from cxvoyager.common.mock_scan_host import mock_scan_host
+from cxvoyager.utils.ip_utils import pick_prefer_ipv6
+from cxvoyager.utils.mock_scan_host import mock_scan_host
 
 
 def _resolve_plan(path: str | None) -> Path:
@@ -114,7 +114,7 @@ def _prompt_real_scan_config(enable_prompt: bool) -> Tuple[str | None, str | Non
 
     if token:
         masked = token[:4] + "..." if len(token) > 8 else "*" * len(token)
-        print(f"当前 token: {masked} (来自 cxvoyager/common/config/default.yml)")
+        print(f"当前 token: {masked} (来自 cxvoyager/library/common/config/default.yml)")
     custom_token = getpass.getpass("自定义 token (可选)：")
     if custom_token:
         token = custom_token.strip() or None
@@ -413,4 +413,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

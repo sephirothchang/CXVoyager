@@ -13,13 +13,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from cxvoyager.common.config import Config, load_config
-from cxvoyager.common.logging_config import setup_logging
-from cxvoyager.common.system_constants import DEFAULT_CONFIG_FILE
-from cxvoyager.core.deployment.handlers import deploy_cloudtower
-from cxvoyager.core.deployment.host_discovery_scanner import scan_hosts
-from cxvoyager.core.deployment.runtime_context import RunContext
-from cxvoyager.integrations.excel.planning_sheet_parser import find_plan_file, parse_plan, to_model
+from cxvoyager.library.common.config import Config, load_config
+from cxvoyager.library.common.logging_config import setup_logging
+from cxvoyager.library.common.system_constants import DEFAULT_CONFIG_FILE
+from cxvoyager.process.handlers import deploy_cloudtower
+from cxvoyager.process.workflow.host_discovery_scanner import scan_hosts
+from cxvoyager.process.workflow.runtime_context import RunContext
+from cxvoyager.library.integrations.excel.planning_sheet_parser import find_plan_file, parse_plan, to_model
 
 
 def _resolve_plan(path: str | None) -> Path:

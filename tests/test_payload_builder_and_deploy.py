@@ -9,12 +9,12 @@ from pathlib import Path
 
 import pytest
 
-from cxvoyager.core.deployment.payload_builder import generate_deployment_payload
-from cxvoyager.core.deployment.handlers import init_cluster
-from cxvoyager.core.deployment.progress import PROGRESS_MESSAGES_KEY, create_stage_progress_logger
-from cxvoyager.core.deployment.runtime_context import RunContext
-from cxvoyager.core.deployment.stage_manager import Stage
-from cxvoyager.models.planning_sheet_models import HostRow, PlanModel
+from cxvoyager.process.workflow.payload_builder import generate_deployment_payload
+from cxvoyager.process.handlers import init_cluster
+from cxvoyager.process.workflow.progress import PROGRESS_MESSAGES_KEY, create_stage_progress_logger
+from cxvoyager.process.workflow.runtime_context import RunContext
+from cxvoyager.process.workflow.stage_manager import Stage
+from cxvoyager.library.models.planning_sheet_models import HostRow, PlanModel
 
 
 @pytest.fixture()

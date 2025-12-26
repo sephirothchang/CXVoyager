@@ -24,7 +24,6 @@
 - CLI & Web 接口
 
 # CLI 入口（保持向后兼容）
-from .interfaces.cli import app as cli_app  # noqa: E402,F401
+from .resources.interfaces.cli import app as cli_app  # noqa: E402,F401
 """
 from .application_version import __version__  # noqa: F401
-

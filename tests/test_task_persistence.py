@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 
-from cxvoyager.core.deployment.deployment_executor import RunOptions
-from cxvoyager.core.deployment.stage_manager import Stage
-from cxvoyager.interfaces.web.task_scheduler import TaskManager, TaskRecord, TaskStatus
+from cxvoyager.process.workflow.deployment_executor import RunOptions
+from cxvoyager.process.workflow.stage_manager import Stage
+from cxvoyager.resources.interfaces.web.task_scheduler import TaskManager, TaskRecord, TaskStatus
 
 
 def _make_record(task_id: str, stage: Stage, status: TaskStatus) -> TaskRecord:

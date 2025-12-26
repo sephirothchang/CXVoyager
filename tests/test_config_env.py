@@ -1,6 +1,6 @@
 import os
 
-from cxvoyager.common.config import load_config
+from cxvoyager.library.common.config import load_config
 
 
 def test_load_config_uses_env_token(tmp_path, monkeypatch):
