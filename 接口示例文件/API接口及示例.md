@@ -2806,23 +2806,699 @@ x-smartx-token：d513e36581044eb691ba9589eebac995
 
   ## 部署备份
   
-  ### 上传备份安装包
-
+  ### 初始化上传备份安装包
   请求网址
-  https://your_tower_url/api
+  https://10.0.20.2/api
   请求方法
   POST
 
   header
-  Authorization: token（通过cloudtower登录接口获取的token）
-  Content-Type: multipart/form-data
-  Content-Language: en-US
-
+  content-type
+  application/json
+  cookie
+  path=/; path=/; connect.sid=s%3Acmjmocflm03iz7tud2ayldusp.Ue%2B5hc4wvjviC1qh0uufqZpCT%2F3PlzWuTabpjbehiUo
 
   载荷
-  {"operationName":"createUploadTask","variables":{"data":{"status":"INITIALIZING","current_chunk":1,"chunk_size":4194304,"resource_type":"CLOUDTOWER_APPLICATION_PACKAGE","size":426394976,"args":{"name":"smtx-backup-dr-x86_64-2.2.1.tar.gz","package_name":"iomesh-backup"},"started_at":"2025-12-09T04:49:01.038Z"}},"query":"mutation createUploadTask($data: UploadTaskCreateInput!) {\n  createUploadTask(data: $data) {\n    id\n    current_chunk\n    chunk_size\n    __typename\n  }\n}\n"}
+  {"operationName":"createUploadTask","variables":{"data":{"status":"INITIALIZING","current_chunk":1,"chunk_size":4194304,"resource_type":"CLOUDTOWER_APPLICATION_PACKAGE","size":426394976,"args":{"name":"smtx-backup-dr-x86_64-2.2.1.tar.gz","package_name":"iomesh-backup"},"started_at":"2025-12-26T10:16:22.323Z"}},"query":"mutation createUploadTask($data: UploadTaskCreateInput!) {\n  createUploadTask(data: $data) {\n    id\n    current_chunk\n    chunk_size\n    __typename\n  }\n}\n"}
 
-  ### 进行部署
+  响应
+  {
+    "data": {
+        "createUploadTask": {
+            "id": "cmjmpvci00io009585faip23e",
+            "current_chunk": 1,
+            "chunk_size": 4194304,
+            "__typename": "UploadTask"
+        }
+    }
+  }
+
+  ### 上传备份安装包
+  请求网址
+  https://10.0.20.2/api
+  请求方法
+  POST
+
+  header
+  content-length
+  4195101
+  content-type
+  multipart/form-data; boundary=----WebKitFormBoundaryWEf45EzjLT4tLzca
+  cookie
+  path=/; path=/; connect.sid=s%3Acmjmocflm03iz7tud2ayldusp.Ue%2B5hc4wvjviC1qh0uufqZpCT%2F3PlzWuTabpjbehiU
+
+  载荷（upload_task_id":"cmjmpvci00io009585faip23e"是上一步返回的id，current_chunk":42表示上传第42块数据）
+
+  ------WebKitFormBoundaryQcfVBpzaWNBlYbLt
+  Content-Disposition: form-data; name="operations"
+
+  {"operationName":"uploadCloudTowerApplicationPackage","variables":{"data":{"upload_task_id":"cmjmpvci00io009585faip23e","file":null,"current_chunk":42}},"query":"mutation uploadCloudTowerApplicationPackage($data: UploadCloudTowerApplicationPackageInput!) {\n  uploadCloudTowerApplicationPackage(data: $data) {\n    id\n    status\n    current_chunk\n    chunk_size\n    __typename\n  }\n}\n"}
+  ------WebKitFormBoundaryQcfVBpzaWNBlYbLt
+  Content-Disposition: form-data; name="map"
+
+  {"1":["variables.data.file"]}
+  ------WebKitFormBoundaryQcfVBpzaWNBlYbLt
+  Content-Disposition: form-data; name="1"; filename="blob"
+  Content-Type: application/octet-stream
+
+  /_hr®%n¡8¿®­E
+  -¼ÁIÚucûñXÇSä!
+  æ&n?Eòóöøå¯º~!Ñ -òh.ÎPÙT\,b¢-Ó{#VA¶¿Ó«wÅÛÉ«üÁIøPÚñË\z1éõ±?·h2Je±æ¥â#ä¥àç^*¦çù^X<%aT2ô`êTÔî¸5ö@cµdgöã^`gã¿MÑ²C·Jï¦4%-ôü×ÐGvÀ-¤.!EZFµØ.Û(rýÇ^·­9²´AÖ?¾Ãíld¥èaÍÅna?Ï~Nö½Ô½å¾Åô{|3V8±ÒûÅßQÎ÷/E<ÌÆqzÓdjÂ8S¢{ÊæykA¦åkÔÚÛ|>¿ÐÐ³RI'à5Yaß¸ÈÉ <þAÏEPæüÌ×|[k2¼ÛJ/UOD>õ8ßï«çße?©â¾oÄ­ÁÁô1x¶=DôÅ¤ôBå
+  }nnë(Ñ·ñØ"÷²¤?#u	¡zî,²°%oxK¨»v_ÌÕ[Y§éÁ¯.µÖùÐJþ´Ö aüÑ-«í©d|Âµ±k
+
+  响应
+  {
+    "data": {
+        "uploadCloudTowerApplicationPackage": {
+            "id": "cmjmpvci00io009585faip23e",
+            "status": "UPLOADING",
+            "current_chunk": 42,
+            "chunk_size": 4194304,
+            "__typename": "UploadTask"
+        }
+    }
+  }
+
+
+  ### 查询安装包状态
+  请求网址
+  https://10.0.20.2/api
+  请求方法
+  POST
+
+  cookie
+  path=/; path=/; connect.sid=s%3Acmjmocflm03iz7tud2ayldusp.Ue%2B5hc4wvjviC1qh0uufqZpCT%2F3PlzWuTabpjbehiUo
+
+  载荷
+  {"operationName":"cloudTowerApplicationPackages","variables":{"skip":0,"first":50,"where":{"AND":[{"name":"iomesh-backup"}]}},"query":"query cloudTowerApplicationPackages($where: CloudTowerApplicationPackageWhereInput, $orderBy: CloudTowerApplicationPackageOrderByInput, $skip: Int, $first: Int) {\n  cloudTowerApplicationPackages(where: $where, orderBy: $orderBy, skip: $skip, first: $first) {\n    id\n    filename\n    version\n    architecture\n    __typename\n  }\n  cloudTowerApplicationPackagesConnection(where: $where) {\n    aggregate {\n      count\n      __typename\n    }\n    __typename\n  }\n}\n"}
+
+  响应（返回的id字段即为安装包ID，version是安装包版本，需要和本地匹配）
+  {
+    "data": {
+        "cloudTowerApplicationPackages": [
+            {
+                "id": "cmjmpwgfw0k230958mpmjnmko",
+                "filename": "smtx-backup-dr-x86_64-2.2.1.tar.gz",
+                "version": "2.2.1",
+                "architecture": "X86_64",
+                "__typename": "CloudTowerApplicationPackage"
+            }
+        ],
+        "cloudTowerApplicationPackagesConnection": {
+            "aggregate": {
+                "count": 1,
+                "__typename": "AggregateCloudTowerApplicationPackage"
+            },
+            "__typename": "CloudTowerApplicationPackageConnection"
+        }
+    }
+  }
+
+  
+  ### 创建备份存储网络
+  部署之前需要在存储交换机上创建一个用于备份的存储网络
+
+  #### 先查询虚拟交换机包含vDS-Storage字样的交换机ID
+
+  请求网址
+  https://10.0.20.2/v2/api/get-vdses
+  请求方法
+  POST
+
+  header
+  Authorization:eyJhbGciOiJIUzI1NiJ9.Y21qbW43dzNtMDM3aDA5NTgydzk4d3p2YQ.CU9uQTLbT0IE0C6gsmoMwzC61ivDs3g6OpxSpoFZKmc
+
+  响应（需要获取包含vDS-Storage字样的交换机ID，"id": "cmjmn852w02c40958g9cpgt97",）
+  [
+    {
+        "bond_mode": "active-backup",
+        "cluster": {
+            "id": "cmjmn817t03a00958p6jfr3m1",
+            "name": "CN-BJ-SMTX-Prod-Cls01"
+        },
+        "entityAsyncStatus": null,
+        "everoute_cluster": null,
+        "id": "cmjmn852w02c2095826rkcngk",
+        "internal": false,
+        "labels": [],
+        "local_id": "d9ec09a7-4a1b-494f-8ab1-32a6369f934a_797f0b49-c008-479a-b46a-c0460b95191e",
+        "name": "vDS-Prod-Network",
+        "nics": [
+            {
+                "id": "cmjmn82xy01yr0958d1by4e5e",
+                "name": "ens257"
+            },
+            {
+                "id": "cmjmn82zb020j0958ynw034rj",
+                "name": "ens225"
+            },
+            {
+                "id": "cmjmn82zd020m09587lhixo5l",
+                "name": "ens225"
+            },
+            {
+                "id": "cmjmn82zd020n0958thz02r6i",
+                "name": "ens257"
+            },
+            {
+                "id": "cmjmn831d022l09583u0x7g53",
+                "name": "ens225"
+            },
+            {
+                "id": "cmjmn834j024i09588hvayvax",
+                "name": "ens257"
+            },
+            {
+                "id": "cmjmn834j024j095818npug6i",
+                "name": "ens225"
+            },
+            {
+                "id": "cmjmn834l024k0958jbc6oosb",
+                "name": "ens257"
+            }
+        ],
+        "ovsbr_name": "ovsbr-4231kycbp",
+        "type": "VM",
+        "vlans": [
+            {
+                "id": "cmjmn857t000a109u5rk5dvva",
+                "name": "VLAN-1120"
+            },
+            {
+                "id": "cmjmn857t000b109uwcpxd5r1",
+                "name": "VLAN-1126"
+            },
+            {
+                "id": "cmjmn857u000c109uoivtxoxi",
+                "name": "VLAN-1122"
+            },
+            {
+                "id": "cmjmn857u000d109udgpia0s1",
+                "name": "VLAN-1121"
+            },
+            {
+                "id": "cmjmn857u000e109umxumvnu1",
+                "name": "VLAN-1125"
+            },
+            {
+                "id": "cmjmn857u000f109u3pk241yt",
+                "name": "VLAN-1124"
+            },
+            {
+                "id": "cmjmn857u000g109upvau6v5s",
+                "name": "VLAN-1127"
+            },
+            {
+                "id": "cmjmn857u000h109ug9n6fes4",
+                "name": "VLAN-1123"
+            },
+            {
+                "id": "cmjmn858f000i109u46bprtb6",
+                "name": "VLAN-1128"
+            },
+            {
+                "id": "cmjmn858k000j109ua9kvt1g1",
+                "name": "VLAN-1129"
+            },
+            {
+                "id": "cmjmn858k000k109ujtugbvwr",
+                "name": "VLAN-1130"
+            }
+        ],
+        "vlans_num": 11,
+        "work_mode": "single"
+    },
+    {
+        "bond_mode": "",
+        "cluster": {
+            "id": "cmjmn817t03a00958p6jfr3m1",
+            "name": "CN-BJ-SMTX-Prod-Cls01"
+        },
+        "entityAsyncStatus": null,
+        "everoute_cluster": null,
+        "id": "cmjmn852w02c30958y7etd8ij",
+        "internal": true,
+        "labels": [],
+        "local_id": "d9ec09a7-4a1b-494f-8ab1-32a6369f934a_dc51b1ca-7557-476c-9755-6214ca86e470",
+        "name": "vds-ovsbr-internal",
+        "nics": [],
+        "ovsbr_name": "ovsbr-internal",
+        "type": "VM",
+        "vlans": [
+            {
+                "id": "cmjmn858m000m109u2ospw3g6",
+                "name": "ovsbr-internal-default-network"
+            }
+        ],
+        "vlans_num": 1,
+        "work_mode": "single"
+    },
+    {
+        "bond_mode": "active-backup",
+        "cluster": {
+            "id": "cmjmn817t03a00958p6jfr3m1",
+            "name": "CN-BJ-SMTX-Prod-Cls01"
+        },
+        "entityAsyncStatus": null,
+        "everoute_cluster": null,
+        "id": "cmjmn852w02c40958g9cpgt97",
+        "internal": false,
+        "labels": [],
+        "local_id": "d9ec09a7-4a1b-494f-8ab1-32a6369f934a_38909e6c-59d9-4e59-a21d-f415b0e42b2a",
+        "name": "vDS-Storage-Network",
+        "nics": [
+            {
+                "id": "cmjmn82xv01yj0958nltv6psc",
+                "name": "ens256"
+            },
+            {
+                "id": "cmjmn82xw01yk0958mltgnek2",
+                "name": "ens161"
+            },
+            {
+                "id": "cmjmn82zk020s0958od3c212p",
+                "name": "ens256"
+            },
+            {
+                "id": "cmjmn831c022j0958ab9dbex4",
+                "name": "ens161"
+            },
+            {
+                "id": "cmjmn831d022k09588rr2d466",
+                "name": "ens256"
+            },
+            {
+                "id": "cmjmn834f024g0958cplyx1ca",
+                "name": "ens161"
+            },
+            {
+                "id": "cmjmn837v025n0958c8jxx1el",
+                "name": "ens161"
+            },
+            {
+                "id": "cmjmn837v025o0958xxtyy29v",
+                "name": "ens256"
+            }
+        ],
+        "ovsbr_name": "ovsbr-7j7qtrvsm",
+        "type": "VM",
+        "vlans": [
+            {
+                "id": "cmjmn857s0009109u4sl2icu5",
+                "name": "storage-network"
+            }
+        ],
+        "vlans_num": 1,
+        "work_mode": "single"
+    },
+    {
+        "bond_mode": "active-backup",
+        "cluster": {
+            "id": "cmjmn817t03a00958p6jfr3m1",
+            "name": "CN-BJ-SMTX-Prod-Cls01"
+        },
+        "entityAsyncStatus": null,
+        "everoute_cluster": null,
+        "id": "cmjmn852w02c509589kcitqu1",
+        "internal": false,
+        "labels": [],
+        "local_id": "d9ec09a7-4a1b-494f-8ab1-32a6369f934a_53116410-db6b-49c7-b77d-255063067cb9",
+        "name": "vDS-MgMt-Network",
+        "nics": [
+            {
+                "id": "cmjmn82xx01yn095858vhzg6l",
+                "name": "ens224"
+            },
+            {
+                "id": "cmjmn82xx01yo0958rhjrkt0q",
+                "name": "ens192"
+            },
+            {
+                "id": "cmjmn82zb020i095811kbene5",
+                "name": "ens224"
+            },
+            {
+                "id": "cmjmn82zc020k0958suq44nad",
+                "name": "ens192"
+            },
+            {
+                "id": "cmjmn831f022n09581n7eavpv",
+                "name": "ens224"
+            },
+            {
+                "id": "cmjmn831f022o0958jjxmxl3i",
+                "name": "ens192"
+            },
+            {
+                "id": "cmjmn8358024r0958u1yqy4tf",
+                "name": "ens224"
+            },
+            {
+                "id": "cmjmn835d024t095815wdavxf",
+                "name": "ens192"
+            }
+        ],
+        "ovsbr_name": "ovsbr-c9d6xjuzp",
+        "type": "VM",
+        "vlans": [
+            {
+                "id": "cmjmn857s0008109uo39kdcuz",
+                "name": "mgt-network"
+            },
+            {
+                "id": "cmjmn858l000l109usa2uhc64",
+                "name": "default"
+            }
+        ],
+        "vlans_num": 2,
+        "work_mode": "single"
+    }
+  ]
+
+  #### 创建备份存储网络
+  在存储交换机上创建一个用于备份的存储网络
+  请求网址
+  https://10.0.20.2/v2/api/create-vm-vlan
+  请求方法
+  POST
+  header
+  Authorization:eyJhbGciOiJIUzI1NiJ9.Y21qbW43dzNtMDM3aDA5NTgydzk4d3p2YQ.CU9uQTLbT0IE0C6gsmoMwzC61ivDs3g6OpxSpoFZKmc
+
+   载荷（vds_id字段是上一步查询到的包含vDS-Storage字样的交换机ID，name字段是固定值，vlan_id字段是固定值）
+  [
+    {
+      "vds_id": "cmjmn852w02c40958g9cpgt97",
+      "name": "name-string"
+    }
+  ]
+
+  响应（返回的id字段即为新建的用于备份服务的存储网络UUID，后续部署需要用该UUID）
+  [
+    {
+        "data": {
+            "id": "cmjms8zak0tm40958f422tc05",
+            "local_id": "74d3f299-d217-4b62-bb8c-5bbc6309274f",
+            "name": "name-string",
+            "type": "VM",
+            "vlan_id": 0,
+            "gateway_ip": null,
+            "subnetmask": null,
+            "mode_type": "VLAN_ACCESS",
+            "entityAsyncStatus": "CREATING",
+            "gateway_subnetmask": null,
+            "qos_min_bandwidth": null,
+            "qos_max_bandwidth": null,
+            "qos_priority": null,
+            "qos_burst": null,
+            "network_ids": [
+                "0"
+            ],
+            "vds": {
+                "id": "cmjmn852w02c40958g9cpgt97",
+                "name": "vDS-Storage-Network"
+            },
+            "labels": []
+        },
+        "task_id": "cmjms8zat08lm7tudhsis2ry8"
+    }
+  ]
+
+
+  ### 进行备份服务部署
+
+  请求网址
+  https://10.0.20.2/api
+  请求方法
+  POST
+
+  cookie
+  path=/; path=/; connect.sid=s%3Acmjmocflm03iz7tud2ayldusp.Ue%2B5hc4wvjviC1qh0uufqZpCT%2F3PlzWuTabpjbehiUo
+
+  载荷
+    (
+    注意application.targetPackage字段的值是上一步返回的安装包ID,
+    "storage_network_type": "NEW_NIC",  表示使用新建的存储网络，
+    "backup_network_type": "MANAGEMENT",  表示使用管理网络作为备份网络，
+    "management_network_gateway": "10.0.20.1",  表示管理网络网关，来源自规划表解析结果
+    "management_network_ip": "10.0.20.4", 表示管理网络IP，来源自规划表解析结果
+    "management_network_subnet_mask": "255.255.255.0", 表示管理网络子网掩码，来源自规划表解析结果
+    "management_network_vlan": "cmjmn858l000l109usa2uhc64", 表示管理网络UUID，来源自查询网络接口
+    "storage_network_ip": "10.0.21.4", 表示存储网络IP，来源自规划表解析结果
+    "storage_network_subnet_mask": "255.255.255.0", 表示存储网络子网掩码，来源自规划表解析结果
+    "storage_network_vlan": "cmjmn857u000d109udgpia0s1", 表示存储网络UUID，来源自查询网络接口
+    "backup_network_gateway": "10.0.20.1", 当前使用管理网络作为备份网络时，备份网络网关和管理网络网关一致
+    "backup_network_ip": "10.0.20.4", 当前使用管理网络作为备份网络时，备份网络IP和管理网络IP一致
+    "backup_network_subnet_mask": "255.255.255.0", 当前使用管理网络作为备份网络时，备份网络子网掩码和管理网络子网掩码一致
+    "backup_network_vlan": "cmjmn858l000l109usa2uhc64" , 当前使用管理网络作为备份网络时，备份网络UUID和管理网络UUID一致
+    running_cluster字段是部署备份服务的集群ID，
+    running_host字段是部署备份服务的主机ID，设置为AUTO_SCHEDULE让系统自动选择主机
+
+    )
+
+  {"operationName":"createBackupService","variables":{"data":{"name":"backup","entityAsyncStatus":"CREATING","status":"INSTALLING","application":{"create":{"instances":{"create":[]},"state":"INSTALLING","instanceStatuses":[],"name":"backup-bak","resourceVersion":0,"vmSpec":{},"targetPackage":"cmjmpwgfw0k230958mpmjnmko"}},"kube_config":"","storage_network_type":"NEW_NIC","backup_network_type":"MANAGEMENT","management_network_gateway":"10.0.20.1","management_network_ip":"10.0.20.4","management_network_subnet_mask":"255.255.255.0","management_network_vlan":"cmjmn858l000l109usa2uhc64","storage_network_ip":"10.0.21.4","storage_network_subnet_mask":"255.255.255.0","storage_network_vlan":"cmjmn857u000d109udgpia0s1","backup_network_gateway":"10.0.20.1","backup_network_ip":"10.0.20.4","backup_network_subnet_mask":"255.255.255.0","backup_network_vlan":"cmjmn858l000l109usa2uhc64"},"effect":{"running_cluster":"cmjmn817t03a00958p6jfr3m1","running_host":"AUTO_SCHEDULE"}},"query":"mutation createBackupService($data: BackupServiceCreateInput!, $effect: CreateBackupServiceEffect) {\n  createBackupService(data: $data, effect: $effect) {\n    id\n    __typename\n  }\n}\n"}
+
+  响应（返回的id字段即为备份服务实例ID）
+  {
+    "data": {
+        "createBackupService": {
+            "id": "cmjmqhze006c47tudhqjjbrlf",
+            "__typename": "BackupService"
+        }
+    }
+  }
+
+
+  ### 查询备份服务部署状态
+
+  需要满足两个条件：
+
+  1、backupService的status字段变成RUNNING
+  请求网址
+  https://10.0.20.2/api
+  请求方法
+  POST
+
+  cookie
+  path=/; path=/; connect.sid=s%3Acmjmocflm03iz7tud2ayldusp.Ue%2B5hc4wvjviC1qh0uufqZpCT%2F3PlzWuTabpjbehiUo
+
+  载荷
+  {"operationName":"getBackupServices","variables":{},"query":"query getBackupServices($where: BackupServiceWhereInput) {\n  backupServices(where: $where) {\n    id\n    name\n    status\n    entityAsyncStatus\n    application {\n      id\n      package {\n        id\n        version\n        architecture\n        __typename\n      }\n      targetPackage\n      instanceStatuses\n      __typename\n    }\n    backup_clusters {\n      id\n      name\n      __typename\n    }\n    backup_plans {\n      id\n      name\n      __typename\n    }\n    running_vm {\n      id\n      status\n      cpu_usage\n      memory_usage\n      __typename\n    }\n    __typename\n  }\n}\n"}
+
+  响应（状态为INSTALLING表示正在部署中,变成RUNNING表示部署完成）
+  {
+      "data": {
+          "backupServices": [
+              {
+                  "id": "cmjmqhze006c47tudhqjjbrlf",
+                  "name": "bak",
+                  "status": "INSTALLING",
+                  "entityAsyncStatus": "CREATING",
+                  "application": {
+                      "id": "cmjmqhze50m5j0958fp6tprio",
+                      "package": {
+                          "id": "cmjmpwgfw0k230958mpmjnmko",
+                          "version": "2.2.1",
+                          "architecture": "X86_64",
+                          "__typename": "CloudTowerApplicationPackage"
+                      },
+                      "targetPackage": "cmjmpwgfw0k230958mpmjnmko",
+                      "instanceStatuses": [
+                          {
+                              "applicationId": "cmjmqhze50m5j0958fp6tprio",
+                              "vm": {
+                                  "id": "cmjmqi2ap0m9v0958gbhlavdq",
+                                  "name": "backup-bak-0",
+                                  "cluster": "cmjmn817t03a00958p6jfr3m1",
+                                  "cpu": 4,
+                                  "memory": 17179869184,
+                                  "vmStatus": "RUNNING",
+                                  "storages": [
+                                      {
+                                          "size": 21474836480
+                                      }
+                                  ],
+                                  "network": {
+                                      "nics": [
+                                          {
+                                              "vlanId": "cmjmn858l000l109usa2uhc64",
+                                              "ip": "10.0.20.4",
+                                              "mask": "255.255.255.0",
+                                              "gateway": "10.0.20.1"
+                                          },
+                                          {
+                                              "vlanId": "cmjmn857u000d109udgpia0s1",
+                                              "ip": "10.0.21.4",
+                                              "mask": "255.255.255.0"
+                                          }
+                                      ]
+                                  },
+                                  "env": [
+                                      {
+                                          "name": "TOWER_ENDPOINT",
+                                          "value": "10.0.20.2"
+                                      },
+                                      {
+                                          "name": "TOWER_USERNAME",
+                                          "value": "system-service"
+                                      },
+                                      {
+                                          "name": "TOWER_PASSWORD",
+                                          "value": "K5yt3hcjtUE4Teqe"
+                                      },
+                                      {
+                                          "name": "TOWER_USER_SOURCE",
+                                          "value": "LOCAL"
+                                      },
+                                      {
+                                          "name": "BACKUP_SERVICE_ID",
+                                          "value": "cmjmqhze006c47tudhqjjbrlf"
+                                      },
+                                      {
+                                          "name": "SERVICE_OPTIONS",
+                                          "value": "--enable-backup"
+                                      },
+                                      {
+                                          "name": "SERVICE_NAMESPACE",
+                                          "value": "iomesh-backup"
+                                      },
+                                      {
+                                          "name": "GLOBAL_CONFIG_NAME",
+                                          "value": "iomesh-backup-global-options"
+                                      }
+                                  ],
+                                  "publicKeys": [
+                                      "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC18BGUVj/yAKmOBqHakDS5uiQJi/tDa2s3mp3Cc2fKDaWQTRx6j7x66kTfT1Ppz1GknbEnKMoyg6EW2DAJfRx6aSFOF2Jkka8CsO3UPZvB/Af5ltMozqoUpzcWLr/kehgyAbkFoFD9dzuKzkn1s4P52Ey+1SB5cJToqFy1xpJDpdFDMPac5TMLwuX3vclRYcVp88o/cwsFKXWy3fcPbaBrnZxgPTx65TJx3h49s1MAaZJtNjbMw0VkE/g1gRHfY7kE0t9P/GDHuKKDquwKwUs1VoLqFtNe0HVy4hSd9HdlXCTjrqkjd1eOs8juMwMrjxN0f9LbEkw8AA6fKDdLPBsZ\n"
+                                  ],
+                                  "vmUsage": "BACKUP_CONTROLLER",
+                                  "bootWithHost": true,
+                                  "status": {
+                                      "vmIps": [
+                                          ""
+                                      ],
+                                      "message": "RUNNING"
+                                  }
+                              },
+                              "package": {
+                                  "id": "cmjmpwgfw0k230958mpmjnmko"
+                              },
+                              "status": {
+                                  "phase": "RUNNING",
+                                  "containerStatuses": [
+                                      {
+                                          "name": "launcher",
+                                          "containerID": "dfffffeda76b6879f6ce887ff00bf43278484a38f3d84e8e47821bee93b649e7",
+                                          "image": "registry.local/backup-dr/backup-launcher:2.2.1",
+                                          "imageID": "sha256:3f77db9f87f8014b1706c8dfb685b92c19a889fb9a2081d4507ccc7cfea35920",
+                                          "started": true,
+                                          "ready": true,
+                                          "state": {
+                                              "running": {
+                                                  "startedAt": "2025-12-26T10:36:35Z"
+                                              }
+                                          }
+                                      }
+                                  ],
+                                  "error": {}
+                              }
+                          }
+                      ],
+                      "__typename": "CloudTowerApplication"
+                  },
+                  "backup_clusters": [],
+                  "backup_plans": [],
+                  "running_vm": null,
+                  "__typename": "BackupService"
+              }
+          ]
+      }
+  }
+
+
+2、任务状态完成
+请求网址
+https://10.0.20.2/v2/api/get-tasks
+请求方法
+post
+
+header
+Authorization: eyJhbGciOiJIUzI1NiJ9.Y21qbW43dzNtMDM3aDA5NTgydzk4d3p2YQ.CU9uQTLbT0IE0C6gsmoMwzC61ivDs3g6OpxSpoFZKmc
+
+响应（具有Install Application backup-bak类似字样的任务描述对应的任务status变成SUCCESSED表示部署完成）
+{
+        "args": {},
+        "cluster": null,
+        "description": "Install Application backup-bak",
+        "error_code": null,
+        "error_message": null,
+        "finished_at": "2025-12-26T10:36:35.000Z",
+        "id": "cmjmqhzgo0m620958jsdlfmej",
+        "internal": false,
+        "key": null,
+        "local_created_at": "2025-12-26T10:33:59.000Z",
+        "progress": 1,
+        "resource_id": "cmjmqhze50m5j0958fp6tprio",
+        "resource_mutation": null,
+        "resource_rollback_error": null,
+        "resource_rollback_retry_count": null,
+        "resource_rollbacked": null,
+        "resource_type": "CloudTowerApplication",
+        "snapshot": "{\"typename\":\"CloudTowerApplication\"}",
+        "started_at": "2025-12-26T10:33:59.000Z",
+        "status": "SUCCESSED",
+        "steps": [
+            {
+                "current": 0,
+                "finished": true,
+                "key": "HANDLE_SCOS_VM",
+                "per_second": 0,
+                "total": null,
+                "unit": null
+            },
+            {
+                "current": 0,
+                "finished": true,
+                "key": "DEPLOY_PACKAGE",
+                "per_second": 0,
+                "total": null,
+                "unit": null
+            }
+        ],
+        "type": null,
+        "user": {
+            "id": "cmjmmuv2m01zz0958rg0pcywp",
+            "name": "system service"
+        }
+    }
+
+
+
+  ### 关联集群
+请求网址
+https://10.0.20.2/api
+请求方法
+POST
+
+header
+cookie
+path=/; path=/; connect.sid=s%3Acmjmocflm03iz7tud2ayldusp.Ue%2B5hc4wvjviC1qh0uufqZpCT%2F3PlzWuTabpjbehiUo
+
+载荷
+（id":"cmjmqhze006c47tudhqjjbrlf"是上一步返回的备份服务实例ID，"cmjmn817t03a00958p6jfr3m1"是需要关联的集群ID）
+{"operationName":"updateBackupService","variables":{"where":{"id":"cmjmqhze006c47tudhqjjbrlf"},"data":{"backup_clusters":{"set":[{"id":"cmjmn817t03a00958p6jfr3m1"}]}}},"query":"mutation updateBackupService($where: BackupServiceWhereUniqueInput!, $data: BackupServiceUpdateInput!) {\n  updateBackupService(where: $where, data: $data) {\n    id\n    name\n    __typename\n  }\n}\n"}
+
+响应（返回的id字段即为备份服务实例ID，正常返回200表示关联成功）
+{
+    "data": {
+        "updateBackupService": {
+            "id": "cmjmqhze006c47tudhqjjbrlf",
+            "name": "bak",
+            "__typename": "BackupService"
+        }
+    }
+}
+
+
+
 
 # 08-集群巡检
 
