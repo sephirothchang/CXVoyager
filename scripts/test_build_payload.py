@@ -42,7 +42,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from cxvoyager.common.config import load_config
 from cxvoyager.common.system_constants import DEFAULT_CONFIG_FILE
 from cxvoyager.integrations.excel.planning_sheet_parser import find_plan_file, parse_plan, to_model
-from cxvoyager.core.deployment.host_discovery_scanner import scan_hosts
+from cxvoyager.workflow.host_discovery_scanner import scan_hosts
 from cxvoyager.models import (
     ClusterDeployPayload,
     HostDeployPayload,
@@ -52,8 +52,8 @@ from cxvoyager.models import (
     VDS,
     VDSBond,
 )
-from cxvoyager.common.ip_utils import pick_prefer_ipv6
-from cxvoyager.common.mock_scan_host import mock_scan_host
+from cxvoyager.utils.ip_utils import pick_prefer_ipv6
+from cxvoyager.utils.mock_scan_host import mock_scan_host
 
 
 def _resolve_plan(path: str | None) -> Path:

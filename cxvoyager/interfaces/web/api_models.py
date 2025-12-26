@@ -23,8 +23,8 @@ from typing import Any, Dict, List, Optional, Mapping
 
 from pydantic import BaseModel, Field
 
-from cxvoyager.core.deployment.deployment_executor import RunOptions, StageInfo
-from cxvoyager.core.deployment.stage_manager import Stage
+from cxvoyager.workflow.deployment_executor import RunOptions, StageInfo
+from cxvoyager.workflow.stage_manager import Stage
 from cxvoyager.common.config import load_config
 
 from .task_scheduler import TaskRecord, TaskStatus, serialize_task

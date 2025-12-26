@@ -9,11 +9,11 @@ from pathlib import Path
 
 import pytest
 
-from cxvoyager.core.deployment.payload_builder import generate_deployment_payload
-from cxvoyager.core.deployment.handlers import init_cluster
-from cxvoyager.core.deployment.progress import PROGRESS_MESSAGES_KEY, create_stage_progress_logger
-from cxvoyager.core.deployment.runtime_context import RunContext
-from cxvoyager.core.deployment.stage_manager import Stage
+from cxvoyager.workflow.payload_builder import generate_deployment_payload
+from cxvoyager.handlers import init_cluster
+from cxvoyager.workflow.progress import PROGRESS_MESSAGES_KEY, create_stage_progress_logger
+from cxvoyager.workflow.runtime_context import RunContext
+from cxvoyager.workflow.stage_manager import Stage
 from cxvoyager.models.planning_sheet_models import HostRow, PlanModel
 
 

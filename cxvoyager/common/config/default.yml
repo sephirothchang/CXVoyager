@@ -7,7 +7,7 @@ logging:
 api:
   # 由 `core/deployment/handlers/init_cluster.py` 与部署阶段（deploy_obs/deploy_bak/...）传给 `integrations.smartx.api_client.APIClient`，覆盖 SmartX API 的基址。
   base_url:
-  # `init_cluster` 若启用 mock 将转向 `common.mock_scan_host`，部署阶段仅保留 dry-run（无 mock）。
+  # `init_cluster` 若启用 mock 将转向 `utils.mock_scan_host`，部署阶段仅保留 dry-run（无 mock）。
   mock: false
   # SmartX 鉴权令牌，`init_cluster`/各 deploy_* 阶段/`core/deployment/host_discovery_scanner.py` 在请求头中使用；`common/config/__init__.py` 会保证该键存在。
   x-smartx-token: "e79b85fc18b7402fbcc0391fe8d7d24c"

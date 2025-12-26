@@ -2,7 +2,7 @@ from ipaddress import ip_address
 
 import pytest
 
-from cxvoyager.core.deployment import host_discovery_scanner as scanner
+from cxvoyager.workflow import host_discovery_scanner as scanner
 from cxvoyager.models.planning_sheet_models import HostRow, PlanModel, VirtualNetworkRow
 
 

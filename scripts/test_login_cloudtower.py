@@ -3,8 +3,8 @@ import argparse
 import json
 import logging
 
-from cxvoyager.core.deployment.login_cloudtower import login_cloudtower
-from cxvoyager.core.deployment.runtime_context import RunContext
+from cxvoyager.workflow.login_cloudtower import login_cloudtower
+from cxvoyager.workflow.runtime_context import RunContext
 from cxvoyager.models.planning_sheet_models import PlanModel, MgmtInfo
 
 logging.basicConfig(level=logging.DEBUG)

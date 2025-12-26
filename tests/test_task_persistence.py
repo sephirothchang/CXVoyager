@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
-from cxvoyager.core.deployment.deployment_executor import RunOptions
-from cxvoyager.core.deployment.stage_manager import Stage
+from cxvoyager.workflow.deployment_executor import RunOptions
+from cxvoyager.workflow.stage_manager import Stage
 from cxvoyager.interfaces.web.task_scheduler import TaskManager, TaskRecord, TaskStatus
 
 

@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import pytest
 
-from cxvoyager.core.deployment.handlers import attach_cluster
-from cxvoyager.core.deployment.runtime_context import RunContext
+from cxvoyager.handlers import attach_cluster
+from cxvoyager.workflow.runtime_context import RunContext
 from cxvoyager.models import PlanModel
 
 

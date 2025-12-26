@@ -14,4 +14,4 @@
 # You should have received a copy of the GNU General Public License
 # along with CXVoyager.  If not, see <https://www.gnu.org/licenses/>.
 
-"""通用基础模块集合。"""
+"""规划表验证模块。"""

@@ -23,10 +23,10 @@ import typer
 from rich.console import Console
 from cxvoyager.common.logging_config import setup_logging
 from cxvoyager.integrations.excel.planning_sheet_parser import find_plan_file, parse_plan, to_model
-from cxvoyager.core.validation.validator import validate
-from cxvoyager.core.deployment.host_discovery_scanner import scan_hosts, get_host_scan_defaults
-from cxvoyager.core.deployment.payload_builder import generate_deployment_payload
-from cxvoyager.core.deployment.deployment_executor import (
+from cxvoyager.validation.validator import validate
+from cxvoyager.workflow.host_discovery_scanner import scan_hosts, get_host_scan_defaults
+from cxvoyager.workflow.payload_builder import generate_deployment_payload
+from cxvoyager.workflow.deployment_executor import (
     RunOptions,
     execute_run,
     list_stage_infos,

@@ -10,8 +10,8 @@ import openpyxl
 import pytest
 
 from cxvoyager.common.config import Config
-from cxvoyager.core.deployment.handlers import config_cluster
-from cxvoyager.core.deployment.runtime_context import RunContext
+from cxvoyager.handlers import config_cluster
+from cxvoyager.workflow.runtime_context import RunContext
 from cxvoyager.integrations.excel import field_variables as plan_vars
 from cxvoyager.models.planning_sheet_models import HostRow, PlanModel
 

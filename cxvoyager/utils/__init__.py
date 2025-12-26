@@ -14,4 +14,16 @@
 # You should have received a copy of the GNU General Public License
 # along with CXVoyager.  If not, see <https://www.gnu.org/licenses/>.
 
-"""通用基础模块集合。"""
+"""实用工具模块集合。"""
+from .parallel_utils import parallel_map  # noqa: F401
+from .mock_scan_host import mock_scan_host  # noqa: F401
+from .ip_utils import validate_cidrs, pick_prefer_ipv6, is_ipv4, is_ipv6  # noqa: F401
+
+__all__ = [
+    "parallel_map",
+    "mock_scan_host",
+    "validate_cidrs",
+    "pick_prefer_ipv6",
+    "is_ipv4",
+    "is_ipv6",
+]

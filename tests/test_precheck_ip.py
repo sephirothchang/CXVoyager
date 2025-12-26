@@ -3,13 +3,13 @@ from pathlib import Path
 
 import pytest
 
-from cxvoyager.core.deployment.prechecks import cloudtower_ip, cluster_vip, mgmt_hosts
-from cxvoyager.core.deployment.prechecks.runner import run_ip_prechecks
-from cxvoyager.core.deployment.prechecks.types import PrecheckReport, ProbeRecord
-from cxvoyager.core.deployment.runtime_context import RunContext
-from cxvoyager.core.deployment.handlers.prepare import handle_prepare
+from cxvoyager.prechecks import cloudtower_ip, cluster_vip, mgmt_hosts
+from cxvoyager.prechecks.runner import run_ip_prechecks
+from cxvoyager.prechecks.types import PrecheckReport, ProbeRecord
+from cxvoyager.workflow.runtime_context import RunContext
+from cxvoyager.handlers.prepare import handle_prepare
 from cxvoyager.models.planning_sheet_models import PlanModel
-from cxvoyager.common.network_utils import ProbeResult, ProbeTask
+from cxvoyager.utils.network_utils import ProbeResult, ProbeTask
 
 
 class DummyStageLogger:
@@ -132,16 +132,16 @@ def test_handle_prepare_raises_on_ip_errors(monkeypatch, tmp_path, stage_logger)
     ctx = RunContext(work_dir=tmp_path)
     ctx.extra["cli_options"] = {}
 
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.create_stage_progress_logger", lambda *args, **kwargs: stage_logger)
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.load_config", lambda *_: {"validation": {"strict": False}})
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.find_plan_file", lambda *_: Path("plan.xlsx"))
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.parse_plan", lambda *_: {"dummy": True})
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.to_model", lambda *_: PlanModel())
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.validate", lambda *_: {"ok": True, "warnings": []})
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.check_dependencies", lambda **kwargs: {})
+    monkeypatch.setattr("cxvoyager.handlers.prepare.create_stage_progress_logger", lambda *args, **kwargs: stage_logger)
+    monkeypatch.setattr("cxvoyager.handlers.prepare.load_config", lambda *_: {"validation": {"strict": False}})
+    monkeypatch.setattr("cxvoyager.handlers.prepare.find_plan_file", lambda *_: Path("plan.xlsx"))
+    monkeypatch.setattr("cxvoyager.handlers.prepare.parse_plan", lambda *_: {"dummy": True})
+    monkeypatch.setattr("cxvoyager.handlers.prepare.to_model", lambda *_: PlanModel())
+    monkeypatch.setattr("cxvoyager.handlers.prepare.validate", lambda *_: {"ok": True, "warnings": []})
+    monkeypatch.setattr("cxvoyager.handlers.prepare.check_dependencies", lambda **kwargs: {})
 
     error_report = PrecheckReport(records=[ProbeRecord(category="mgmt_host", target="10.0.0.1", level="error", message="失败", probes={})])
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.run_ip_prechecks", lambda *args, **kwargs: error_report)
+    monkeypatch.setattr("cxvoyager.handlers.prepare.run_ip_prechecks", lambda *args, **kwargs: error_report)
 
     with pytest.raises(RuntimeError, match="IP 预检失败"):
         handle_prepare({"ctx": ctx})
@@ -151,16 +151,16 @@ def test_handle_prepare_success_sets_ctx_extra(monkeypatch, tmp_path, stage_logg
     ctx = RunContext(work_dir=tmp_path)
     ctx.extra["cli_options"] = {}
 
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.create_stage_progress_logger", lambda *args, **kwargs: stage_logger)
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.load_config", lambda *_: {"validation": {"strict": False}})
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.find_plan_file", lambda *_: Path("plan.xlsx"))
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.parse_plan", lambda *_: {"dummy": True})
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.to_model", lambda *_: PlanModel())
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.validate", lambda *_: {"ok": True, "warnings": []})
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.check_dependencies", lambda **kwargs: {})
+    monkeypatch.setattr("cxvoyager.handlers.prepare.create_stage_progress_logger", lambda *args, **kwargs: stage_logger)
+    monkeypatch.setattr("cxvoyager.handlers.prepare.load_config", lambda *_: {"validation": {"strict": False}})
+    monkeypatch.setattr("cxvoyager.handlers.prepare.find_plan_file", lambda *_: Path("plan.xlsx"))
+    monkeypatch.setattr("cxvoyager.handlers.prepare.parse_plan", lambda *_: {"dummy": True})
+    monkeypatch.setattr("cxvoyager.handlers.prepare.to_model", lambda *_: PlanModel())
+    monkeypatch.setattr("cxvoyager.handlers.prepare.validate", lambda *_: {"ok": True, "warnings": []})
+    monkeypatch.setattr("cxvoyager.handlers.prepare.check_dependencies", lambda **kwargs: {})
 
     report = PrecheckReport(records=[ProbeRecord(category="mgmt_host", target="10.0.0.1", level="warning", message="提醒", probes={})])
-    monkeypatch.setattr("cxvoyager.core.deployment.handlers.prepare.run_ip_prechecks", lambda *args, **kwargs: report)
+    monkeypatch.setattr("cxvoyager.handlers.prepare.run_ip_prechecks", lambda *args, **kwargs: report)
 
     handle_prepare({"ctx": ctx})
 
@@ -178,11 +178,11 @@ def test_handle_prepare_success_sets_ctx_extra(monkeypatch, tmp_path, stage_logg
 def test_run_ip_prechecks_propagates_has_error(monkeypatch, records, expected):
     ctx = RunContext(plan=PlanModel(), extra={"selected_stages": ["deploy_cloudtower"]})
 
-    monkeypatch.setattr("cxvoyager.core.deployment.prechecks.mgmt_hosts.inspect", lambda *args, **kwargs: [])
-    monkeypatch.setattr("cxvoyager.core.deployment.prechecks.cluster_vip.inspect", lambda *args, **kwargs: [])
-    monkeypatch.setattr("cxvoyager.core.deployment.prechecks.storage_ip.inspect", lambda *args, **kwargs: [])
-    monkeypatch.setattr("cxvoyager.core.deployment.prechecks.cloudtower_ip.inspect", lambda *args, **kwargs: [])
-    monkeypatch.setattr("cxvoyager.core.deployment.prechecks.bmc_ip.inspect", lambda *args, **kwargs: records)
+    monkeypatch.setattr("cxvoyager.prechecks.mgmt_hosts.inspect", lambda *args, **kwargs: [])
+    monkeypatch.setattr("cxvoyager.prechecks.cluster_vip.inspect", lambda *args, **kwargs: [])
+    monkeypatch.setattr("cxvoyager.prechecks.storage_ip.inspect", lambda *args, **kwargs: [])
+    monkeypatch.setattr("cxvoyager.prechecks.cloudtower_ip.inspect", lambda *args, **kwargs: [])
+    monkeypatch.setattr("cxvoyager.prechecks.bmc_ip.inspect", lambda *args, **kwargs: records)
 
     report = run_ip_prechecks(ctx)
     assert report.has_error is expected

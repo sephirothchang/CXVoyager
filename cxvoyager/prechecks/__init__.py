@@ -14,4 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with CXVoyager.  If not, see <https://www.gnu.org/licenses/>.
 
-"""通用基础模块集合。"""
+"""预检查模块集合。"""
+from .runner import run_ip_prechecks  # noqa: F401
+
+__all__ = ["run_ip_prechecks"]

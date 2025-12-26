@@ -29,7 +29,7 @@ from ..api_models import (
     TaskSummaryModel,
     UIDefaultsModel,
 )
-from cxvoyager.core.deployment.deployment_executor import list_stage_infos
+from cxvoyager.workflow.deployment_executor import list_stage_infos
 from ..task_scheduler import TaskStatus, task_manager
 
 router = APIRouter(prefix="", tags=["deploy"])

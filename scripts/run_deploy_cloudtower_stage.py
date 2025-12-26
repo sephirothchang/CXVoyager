@@ -16,9 +16,9 @@ if str(PROJECT_ROOT) not in sys.path:
 from cxvoyager.common.config import Config, load_config
 from cxvoyager.common.logging_config import setup_logging
 from cxvoyager.common.system_constants import DEFAULT_CONFIG_FILE
-from cxvoyager.core.deployment.handlers import deploy_cloudtower
-from cxvoyager.core.deployment.host_discovery_scanner import scan_hosts
-from cxvoyager.core.deployment.runtime_context import RunContext
+from cxvoyager.handlers import deploy_cloudtower
+from cxvoyager.workflow.host_discovery_scanner import scan_hosts
+from cxvoyager.workflow.runtime_context import RunContext
 from cxvoyager.integrations.excel.planning_sheet_parser import find_plan_file, parse_plan, to_model
 
 

@@ -6,14 +6,14 @@ from types import SimpleNamespace
 from typing import cast
 
 from cxvoyager.common.config import Config
-from cxvoyager.core.deployment.progress import (
+from cxvoyager.workflow.progress import (
     PROGRESS_MESSAGES_KEY,
     create_stage_progress_logger,
     record_progress,
 )
-from cxvoyager.core.deployment.runtime_context import RunContext
-from cxvoyager.core.deployment.stage_manager import Stage
-from cxvoyager.core.deployment.handlers.attach_cluster import handle_attach_cluster
+from cxvoyager.workflow.runtime_context import RunContext
+from cxvoyager.workflow.stage_manager import Stage
+from cxvoyager.handlers.attach_cluster import handle_attach_cluster
 from cxvoyager.models import PlanModel
 
 
