@@ -2880,6 +2880,20 @@ x-smartx-token：d513e36581044eb691ba9589eebac995
   }
 
 
+  最后一个分片上传完成后的响应，当status变为SUCCESSED表示上传完成
+  {
+    "data": {
+        "uploadCloudTowerApplicationPackage": {
+            "id": "cmjmuex5t13fu0958tfpuyh88",
+            "status": "SUCCESSED",
+            "current_chunk": 102,
+            "chunk_size": 4194304,
+            "__typename": "UploadTask"
+        }
+    }
+}
+
+
   ### 查询安装包状态
   请求网址
   https://10.0.20.2/api

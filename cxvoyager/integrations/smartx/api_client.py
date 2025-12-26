@@ -119,9 +119,7 @@ class APIClient:
                 prepared["host"] = self._host_header
         return prepared
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=5),
-           retry=retry_if_exception_type((requests.RequestException, APIError)))
-    def post(
+    def _post_internal(
         self,
         path: str,
         payload: Optional[Dict[str, Any]] = None,
@@ -185,6 +183,33 @@ class APIClient:
         except requests.RequestException as e:
             logger.error("POST失败: %s", e)
             raise
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=5),
+           retry=retry_if_exception_type((requests.RequestException, APIError)))
+    def post(
+        self,
+        path: str,
+        payload: Optional[Dict[str, Any]] = None,
+        *,
+        headers: Optional[Dict[str, str]] = None,
+        params: Optional[Dict[str, Any]] = None,
+        files: Optional[Dict[str, Any]] = None,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        return self._post_internal(path, payload, headers=headers, params=params, files=files, data=data)
+
+    def post_once(
+        self,
+        path: str,
+        payload: Optional[Dict[str, Any]] = None,
+        *,
+        headers: Optional[Dict[str, str]] = None,
+        params: Optional[Dict[str, Any]] = None,
+        files: Optional[Dict[str, Any]] = None,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """单次 POST（无 tenacity 重试），用于不希望重放的请求，例如文件分片上传。"""
+        return self._post_internal(path, payload, headers=headers, params=params, files=files, data=data)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=5),
            retry=retry_if_exception_type((requests.RequestException, APIError)))
