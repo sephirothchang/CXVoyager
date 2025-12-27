@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import base64
+import importlib
 import logging
 import re
+import shlex
 import time
 import ipaddress
 from urllib.parse import urlparse
@@ -42,6 +44,10 @@ DEFAULT_TASK_WAIT_TIMEOUT = 900  # seconds
 DEFAULT_TASK_POLL_INTERVAL = 5  # seconds
 DEFAULT_INSTANCE_WAIT_TIMEOUT = 1800  # seconds
 DEFAULT_INSTANCE_POLL_INTERVAL = 10  # seconds
+DEFAULT_OBS_SSH_PORT = 22
+DEFAULT_OBS_SSH_TIMEOUT = 10
+DEFAULT_OBS_SSH_USERNAME = "o11y"
+DEFAULT_OBS_SSH_PASSWORD = "HC!r0cks"
 DEFAULT_OBS_NAME = "observability"
 STEP_DELAY_SECONDS = 30
 OBS_PACKAGE_PATTERN = "Observability-*-v*.tar.gz"
@@ -95,6 +101,28 @@ def _resolve_obs_base_url(ctx: RunContext, api_cfg) -> str:
     return normalize_base_url(str(base_url))
 
 
+def _ensure_obs_base_url(ctx: RunContext, api_cfg, stage_logger) -> str:
+    """确保能获取 OBS/CloudTower 基址；若缺失则尝试重新解析规划表后再判定。"""
+
+    base_url = None
+    try:
+        base_url = _resolve_obs_base_url(ctx, api_cfg)
+    except Exception:
+        base_url = None
+
+    if base_url:
+        return base_url
+
+    stage_logger.info(
+        "[deploy_obs] 缺少 CloudTower IP，重新解析规划表以补充上下文",
+        progress_extra={"work_dir": str(ctx.work_dir)},
+    )
+    _ensure_plan_loaded(ctx)
+
+    base_url = _resolve_obs_base_url(ctx, api_cfg)
+    return base_url
+
+
 def _resolve_obs_auth(api_cfg) -> str:
     if isinstance(api_cfg, dict):
         token = api_cfg.get("obs_basic_auth")
@@ -134,8 +162,14 @@ def _normalize_server_list(raw) -> list[str]:
     elif isinstance(raw, str):
         values = [item.strip() for item in raw.replace(";", ",").split(",")]
     else:
-        values = [str(raw).strip()]
-    return [item for item in values if item]
+        values = [raw]
+
+    normalized: list[str] = []
+    for item in values:
+        text = str(item).strip() if item is not None else ""
+        if text:
+            normalized.append(text)
+    return normalized
 
 
 def _init_upload(client: APIClient, package_name: str, headers: dict, stage_logger) -> str:
@@ -1033,6 +1067,218 @@ def _resolve_ntp_servers(ctx: RunContext, api_cfg: dict, deploy_cfg: dict) -> li
     return _normalize_server_list(candidates)
 
 
+def _resolve_dns_servers(ctx: RunContext, api_cfg: dict, deploy_cfg: dict) -> list[str]:
+    plan = getattr(ctx, "plan", None)
+    mgmt = getattr(plan, "mgmt", None)
+
+    candidates = None
+    for attr in ("DNS服务器", "DNS 服务器", "dns_servers"):
+        if mgmt and getattr(mgmt, attr, None):
+            candidates = getattr(mgmt, attr)
+            break
+
+    if candidates is None and isinstance(deploy_cfg, dict):
+        candidates = deploy_cfg.get("dns_servers")
+
+    if candidates is None and isinstance(api_cfg, dict):
+        candidates = api_cfg.get("dns_servers")
+
+    if candidates is None and isinstance(ctx.extra, dict):
+        candidates = ctx.extra.get("dns_servers")
+
+    return _normalize_server_list(candidates)
+
+
+def _resolve_obs_plan_ip(ctx: RunContext) -> str | None:
+    plan = getattr(ctx, "plan", None)
+    mgmt = getattr(plan, "mgmt", None)
+    ip = getattr(mgmt, "obs_ip", None) if mgmt else None
+    return str(ip) if ip else None
+
+
+def _extract_vm_ip_from_instance(instance: dict | None) -> str | None:
+    if not isinstance(instance, dict):
+        return None
+
+    vm_spec = instance.get("vm_spec")
+    if isinstance(vm_spec, dict):
+        ip = vm_spec.get("ip")
+        if ip:
+            return str(ip)
+
+    vm_info = instance.get("vm")
+    if isinstance(vm_info, dict):
+        ip = vm_info.get("ip")
+        if ip:
+            return str(ip)
+
+    return None
+
+
+def _extract_obs_ip_from_verify(verify_resp: dict | None, *, name_hint: str | None = None) -> str | None:
+    data = verify_resp.get("data") if isinstance(verify_resp, dict) else None
+    instances = data.get("bundleApplicationInstances") if isinstance(data, dict) else None
+    if not isinstance(instances, list):
+        return None
+
+    hint = name_hint.lower() if name_hint else None
+    for inst in instances:
+        if not isinstance(inst, dict):
+            continue
+        name = str(inst.get("name") or "").strip().lower()
+        if hint and name != hint:
+            continue
+        if not hint and name not in {"obs", "observability"}:
+            continue
+        ip = _extract_vm_ip_from_instance(inst)
+        if ip:
+            return ip
+    return None
+
+
+def _resolve_obs_vm_ip(
+    *,
+    ctx: RunContext,
+    verify_resp: dict | None,
+    install_wait_resp: dict | None,
+    name_hint: str | None,
+) -> str | None:
+    candidates = [
+        _extract_vm_ip_from_instance(install_wait_resp),
+        _extract_obs_ip_from_verify(verify_resp, name_hint=name_hint),
+        _resolve_obs_plan_ip(ctx),
+    ]
+
+    for ip in candidates:
+        if ip:
+            return str(ip)
+    return None
+
+
+def _wrap_with_bash(command: str) -> str:
+    return f"bash -lc {shlex.quote(command)}"
+
+
+def _create_obs_ssh_client(
+    host: str,
+    *,
+    port: int,
+    username: str,
+    password: str,
+    timeout: int,
+):
+    try:
+        paramiko = importlib.import_module("paramiko")
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError("缺少 paramiko 依赖，请先安装后重试：pip install paramiko") from exc
+
+    ssh_client = paramiko.SSHClient()
+    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh_client.connect(host, port=port, username=username, password=password, timeout=timeout)
+    transport = ssh_client.get_transport()
+    if transport is not None:
+        transport.set_keepalive(30)
+    return ssh_client
+
+
+def _run_obs_sudo_command(*, ssh_client, password: str, command: str, description: str, stage_logger):
+    full_command = f"sudo -S {command}"
+    stage_logger.info(
+        f"[deploy_obs] {description}",
+        progress_extra={"command": command},
+    )
+    stdin, stdout, stderr = ssh_client.exec_command(_wrap_with_bash(full_command), get_pty=True)
+    if password:
+        stdin.write(f"{password}\n")
+        stdin.flush()
+    if not stdin.channel.closed:
+        stdin.channel.shutdown_write()
+
+    stdout_data = stdout.read().decode("utf-8", "ignore").strip()
+    stderr_data = stderr.read().decode("utf-8", "ignore").strip()
+    exit_status = stdout.channel.recv_exit_status()
+
+    if exit_status != 0:
+        raise RuntimeError(f"{description}失败: {stderr_data or stdout_data or exit_status}")
+
+    if stdout_data:
+        stage_logger.debug(
+            f"[deploy_obs] {description} 输出",
+            progress_extra={"stdout": stdout_data.splitlines()[-5:]},
+        )
+    if stderr_data:
+        stage_logger.warning(
+            f"[deploy_obs] {description} 警告",
+            progress_extra={"stderr": stderr_data.splitlines()[-5:]},
+        )
+
+
+def _update_obs_dns_and_restart(
+    *,
+    vm_ip: str | None,
+    dns_servers: list[str],
+    stage_logger,
+    ssh_port: int = DEFAULT_OBS_SSH_PORT,
+    ssh_timeout: int = DEFAULT_OBS_SSH_TIMEOUT,
+    ssh_username: str = DEFAULT_OBS_SSH_USERNAME,
+    ssh_password: str = DEFAULT_OBS_SSH_PASSWORD,
+) -> dict:
+    if not vm_ip:
+        raise RuntimeError("缺少 OBS 虚拟机 IP，无法通过 SSH 更新 DNS")
+
+    stage_logger.info(
+        "[deploy_obs] 准备更新 OBS DNS 并重启容器",
+        progress_extra={"ip": vm_ip, "dns_servers": dns_servers},
+    )
+
+    ssh_client = _create_obs_ssh_client(
+        vm_ip,
+        port=ssh_port,
+        username=ssh_username,
+        password=ssh_password,
+        timeout=ssh_timeout,
+    )
+
+    result = {"ip": vm_ip, "dns_servers": dns_servers}
+    try:
+        if dns_servers:
+            content = "\n".join(f"nameserver {server}" for server in dns_servers)
+            args = " ".join(shlex.quote(line) for line in content.splitlines())
+            dns_command = f"printf '%s\\n' {args} | tee /etc/resolv.conf >/dev/null"
+            _run_obs_sudo_command(
+                ssh_client=ssh_client,
+                password=ssh_password,
+                command=dns_command,
+                description="写入 OBS /etc/resolv.conf",
+                stage_logger=stage_logger,
+            )
+            result["dns_updated"] = True
+        else:
+            stage_logger.info(
+                "[deploy_obs] 跳过更新 OBS DNS（未提供服务器）",
+                progress_extra={"ip": vm_ip},
+            )
+            result["dns_updated"] = False
+
+        restart_cmd = "ids=$(nerdctl ps --format '{{.ID}} {{.Names}}' | awk '/launcher/{print $1}'); "
+        restart_cmd += "if [ -n \"$ids\" ]; then nerdctl restart $ids; else echo 'no launcher containers'; fi"
+        _run_obs_sudo_command(
+            ssh_client=ssh_client,
+            password=ssh_password,
+            command=restart_cmd,
+            description="重启 OBS launcher 容器",
+            stage_logger=stage_logger,
+        )
+        result["containers_restarted"] = True
+    finally:
+        try:
+            ssh_client.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+    return result
+
+
 def _update_obs_ntp(
     *,
     base_url: str,
@@ -1158,7 +1404,7 @@ def handle_deploy_obs(ctx_dict):
 
     _reset_plan_context(ctx)
     _ensure_plan_loaded(ctx)
-    _delay_between_steps(stage_logger, "plan_loaded")
+    # _delay_between_steps(stage_logger, "plan_loaded")
 
     cfg = ctx.config or load_config(DEFAULT_CONFIG_FILE)
     cfg_dict = cfg if isinstance(cfg, dict) else {}
@@ -1181,12 +1427,12 @@ def handle_deploy_obs(ctx_dict):
         search_roots=search_roots,
     )
 
-    base_url = _resolve_obs_base_url(ctx, api_cfg)
+    base_url = _ensure_obs_base_url(ctx, api_cfg, stage_logger)
     login_result = login_cloudtower(ctx, base_url=base_url, api_cfg=api_cfg, stage_logger=stage_logger)
     cookie = login_result.get("cookie") if isinstance(login_result, dict) else None
     ct_token = login_result.get("token") if isinstance(login_result, dict) else None
 
-    _delay_between_steps(stage_logger, "after_login")
+    # _delay_between_steps(stage_logger, "after_login")
 
     if not cookie:
         stage_logger.error(
@@ -1212,7 +1458,7 @@ def handle_deploy_obs(ctx_dict):
         }
     else:
         pre_verify = _verify_obs_pak_instance(ctx, api_cfg, base_url, stage_logger, cookie=cookie, ct_token=ct_token)
-        _delay_between_steps(stage_logger, "after_pre_verify")
+        # _delay_between_steps(stage_logger, "after_pre_verify")
         already_present, existing_version = _is_package_already_present(pre_verify, package_path)
 
         upload_id = None
@@ -1221,6 +1467,7 @@ def handle_deploy_obs(ctx_dict):
         install_create_resp = None
         install_wait_resp = None
         ntp_resp = None
+        dns_restart_resp = None
         system_service_resp = None
 
         if already_present:
@@ -1231,11 +1478,11 @@ def handle_deploy_obs(ctx_dict):
             verify_resp = pre_verify
         else:
             upload_id = _init_upload(client, package_path.name, headers, stage_logger)
-            _delay_between_steps(stage_logger, "after_init_upload")
+            # _delay_between_steps(stage_logger, "after_init_upload")
             _upload_chunks(client, upload_id, package_path, headers, stage_logger, chunk_size)
-            _delay_between_steps(stage_logger, "after_upload_chunks")
+            # _delay_between_steps(stage_logger, "after_upload_chunks")
             commit_resp = _commit_upload(client, upload_id, headers, stage_logger)
-            _delay_between_steps(stage_logger, "after_commit_upload")
+            # _delay_between_steps(stage_logger, "after_commit_upload")
             tasks_resp = _wait_obs_tasks(
                 base_url=base_url,
                 token=ct_token,
@@ -1243,9 +1490,9 @@ def handle_deploy_obs(ctx_dict):
                 api_cfg=api_cfg,
                 package_name=package_path.name,
             )
-            _delay_between_steps(stage_logger, "after_wait_tasks")
+            # _delay_between_steps(stage_logger, "after_wait_tasks")
             verify_resp = _verify_obs_pak_instance(ctx, api_cfg, base_url, stage_logger, cookie=cookie, ct_token=ct_token)
-            _delay_between_steps(stage_logger, "after_verify_post_upload")
+            # _delay_between_steps(stage_logger, "after_verify_post_upload")
 
         associate_resp = None
         try:
@@ -1377,6 +1624,26 @@ def handle_deploy_obs(ctx_dict):
                         progress_extra={"error": str(exc)},
                     )
 
+                obs_vm_ip = _resolve_obs_vm_ip(
+                    ctx=ctx,
+                    verify_resp=verify_resp,
+                    install_wait_resp=install_wait_resp,
+                    name_hint=obs_name,
+                )
+                dns_servers = _resolve_dns_servers(ctx, api_cfg, deploy_cfg)
+                try:
+                    dns_restart_resp = _update_obs_dns_and_restart(
+                        vm_ip=obs_vm_ip,
+                        dns_servers=dns_servers,
+                        stage_logger=stage_logger,
+                    )
+                    _delay_between_steps(stage_logger, "after_dns_update")
+                except Exception as exc:  # noqa: BLE001 - 不中断主流程
+                    stage_logger.warning(
+                        "[deploy_obs] OBS DNS 更新或容器重启失败",
+                        progress_extra={"error": str(exc), "ip": obs_vm_ip},
+                    )
+
                 if cluster_id:
                     associate_resp = _associate_obs_instance(
                         base_url=base_url,
@@ -1411,6 +1678,7 @@ def handle_deploy_obs(ctx_dict):
             "version": verify_resp.get("version") if isinstance(verify_resp, dict) else None,
             "associate": associate_resp,
             "ntp_update": ntp_resp,
+            "dns_restart": dns_restart_resp,
             "associate_system_service": system_service_resp,
             "install_create": install_create_resp,
             "install_wait": install_wait_resp,

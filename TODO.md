@@ -14,8 +14,8 @@
   - [ ] [cxvoyager/core/deployment/payload_builder.py#L452](cxvoyager/core/deployment/payload_builder.py#L452) 存储网络 VLAN ID 从规划表获取而非写死 0。
 - [ ] [cxvoyager/core/deployment/handlers/config_cluster.py#L915-L980](cxvoyager/core/deployment/handlers/config_cluster.py#L915-L980) 批量更新主机 smartx/root 密码流程需修复（当前逻辑未正常生效，依赖 paramiko/SSH，需按设计完成批量修改与错误处理）。
 - [ ] [接口示例文件/API接口及示例.md#L2206-L2207](接口示例文件/API接口及示例.md#L2206-L2207) CloudTower 机架拓扑配置尚未实现，需补齐“读取单独机架表 + 调用 CloudTower 接口”自动化。
-- [ ] Stage 收尾：SSH 连接 OBS，修改 DNS 配置
-	- 阶段：收尾（cleanup）或 OBS 部署后的收尾步骤。
+- [ ] SSH 连接 OBS，修改 DNS 配置
+	- 阶段：OBS 部署
 	- 内容：使用 SSH 登录 OBS VM，修改 DNS（按规划表/配置），并校验生效；需要补充实现及文档说明。
 
 ## 模块优化
@@ -28,10 +28,9 @@
 - [ ] 优化 SSH 命令执行模块
 	- 评估并优化 `cxvoyager/core/deployment/login_cloudtower.py` 中的 SSH 命令执行逻辑，确保命令执行的健壮性和错误处理；考虑将重复代码抽象为公共函数或类，提升代码复用性和可维护性。
 
-
 ## 占位实现
 - [ ] [docs/Step_08-DEPLOY_OBS.md](docs/Step_08-DEPLOY_OBS.md) | [cxvoyager/core/deployment/handlers/deploy_obs.py](cxvoyager/core/deployment/handlers/deploy_obs.py) Stage 08 OBS 部署未打通，需补齐自动化实现/接口调用/结果校验。
-- [ ] [docs/Step_08-DEPLOY_OBS.md](docs/Step_08-DEPLOY_OBS.md) | [cxvoyager/core/deployment/handlers/deploy_obs.py](cxvoyager/core/deployment/handlers/deploy_obs.py) Stage 08 OBS 部署与配置需通过 SSH 登录 OBS 虚拟机完成 DNS 配置文件修改并校验。
+
 - [ ] [docs/Step_08-DEPLOY_OBS.md](docs/Step_08-DEPLOY_OBS.md) | [cxvoyager/core/deployment/handlers/deploy_obs.py](cxvoyager/core/deployment/handlers/deploy_obs.py) Stage 08 OBS 部署需增加 NTP 配置修改与校验。
 - [ ] [docs/Step_09-DEPLOY_BAK.md](docs/Step_09-DEPLOY_BAK.md) | [cxvoyager/core/deployment/handlers/deploy_bak.py](cxvoyager/core/deployment/handlers/deploy_bak.py) Stage 09 备份服务部署未打通，需补齐实现与校验。
 - [ ] [docs/Step_10-DEPLOY_ER.md](docs/Step_10-DEPLOY_ER.md) | [cxvoyager/core/deployment/handlers/deploy_er.py](cxvoyager/core/deployment/handlers/deploy_er.py) Stage 10 远程复制/ER 部署未打通，需补齐实现与校验。
