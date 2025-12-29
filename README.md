@@ -13,7 +13,7 @@ CXVoyager 是一个自动化工具，用于基于集群规划表完成 SmartX SM
 
 ### 运行要求
 
-- Python 3.10
+- Python 3.10+
 - 规划表置于项目根目录，文件名包含“SmartX超融合”“规划设计表”“ELF环境”
 - 无外网场景可提前准备离线包，或运行 `scripts/prepare_offline_packages.py` 下载
 
