@@ -55,9 +55,9 @@ EXTRA_NETWORK_NAME = register_variable("EXTRA_NETWORK_NAME", "虚拟网络", "D5
 STORAGE_NETWORK_NAME = register_variable("STORAGE_NETWORK_NAME", "虚拟网络", "D6", "存储虚拟网络名称")
 BACKUP_NETWORK_NAME = register_variable("BACKUP_NETWORK_NAME", "虚拟网络", "D7", "备份虚拟网络名称")
 
-DEFAULT_MGMT_VLAN_ID = register_variable("DEFAULT_MGMT_VLAN_ID", "虚拟网络", "F4", "默认管理 VLAN ID")
+DEFAULT_MGMT_VLAN_ID = register_variable("DEFAULT_MGMT_VLAN_ID", "虚拟网络", "F4", "默认管理 VLAN ID",default="0")
 EXTRA_VLAN_ID = register_variable("EXTRA_VLAN_ID", "虚拟网络", "F5", "额外管理组件 VLAN ID")
-STORAGE_VLAN_ID = register_variable("STORAGE_VLAN_ID", "虚拟网络", "F6", "存储 VLAN ID")
+STORAGE_VLAN_ID = register_variable("STORAGE_VLAN_ID", "虚拟网络", "F6", "存储 VLAN ID",default="0")
 BACKUP_VLAN_ID = register_variable("BACKUP_VLAN_ID", "虚拟网络", "F7", "备份 VLAN ID")
 
 DEFAULT_MGMT_VLAN_TYPE = register_variable("DEFAULT_MGMT_VLAN_TYPE", "虚拟网络", "G4", "默认管理 VLAN 类型")
@@ -120,6 +120,7 @@ FISHEYE_ADMIN_USER = register_variable("FISHEYE_ADMIN_USER", "主机规划", "L1
 FISHEYE_ADMIN_PASSWORD = register_variable("FISHEYE_ADMIN_PASSWORD", "主机规划", "M19", "Fisheye 集群管理员密码", default="HC!r0cks")
 CLUSTER_SERIAL = register_variable("CLUSTER_SERIAL", "主机规划", "E19", "集群序列号")
 STORAGE_ARCHITECTURE = register_variable("STORAGE_ARCHITECTURE","主机规划","Q19","存储架构（混闪-分层 / 全闪-不分层）",default="混闪-分层")
+NETWORK_ARCHITECTURE = register_variable("NETWORK_ARCHITECTURE","主机规划","Q20","网络架构（三网融合 / 存储独立 / 三网独立）",default="三网独立")
 
 HOST_MAX = 16
 HOST_ROW_RANGE = range(3, 3 + HOST_MAX)

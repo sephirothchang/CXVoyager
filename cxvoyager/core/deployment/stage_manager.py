@@ -121,19 +121,19 @@ _STAGE_METADATA: Dict[Stage, StageInfo] = {
     ),
     Stage.deploy_er: StageInfo(
         name=Stage.deploy_er.value,
-        label="部署 ER",
+        label="部署 ER（暂未实装）",
         description="上传并部署 ER 应用包。",
         group="业务交付",
     ),
     Stage.deploy_sfs: StageInfo(
         name=Stage.deploy_sfs.value,
-        label="部署 SFS",
+        label="部署 SFS（暂未实装）",
         description="上传并部署 SFS 应用包。",
         group="业务交付",
     ),
     Stage.deploy_sks: StageInfo(
         name=Stage.deploy_sks.value,
-        label="部署 SKS",
+        label="部署 SKS（暂未实装）",
         description="上传并部署 SKS 应用包。",
         group="业务交付",
     ),
@@ -145,8 +145,8 @@ _STAGE_METADATA: Dict[Stage, StageInfo] = {
     ),
     Stage.perf_reliability: StageInfo(
         name=Stage.perf_reliability.value,
-        label="性能与可靠性验证",
-        description="执行性能基线与可靠性校验，输出评估报告。",
+        label="性能基线测试",
+        description="执行性能基线测试，输出评估报告。",
         group="验收验证",
     ),
     Stage.cleanup: StageInfo(

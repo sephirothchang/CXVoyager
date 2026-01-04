@@ -279,6 +279,7 @@ def _build_hosts_extra(values: Dict[str, Any]) -> Dict[str, Any]:
         "fisheye_admin_password": _value(values, plan_vars.FISHEYE_ADMIN_PASSWORD),
         "cluster_serial": _value(values, plan_vars.CLUSTER_SERIAL),
         "storage_architecture": _value(values, plan_vars.STORAGE_ARCHITECTURE),
+        "network_architecture": _value(values, plan_vars.NETWORK_ARCHITECTURE),
     }
 
 
@@ -419,11 +420,24 @@ def to_model(parsed: Dict[str, Any]) -> PlanModel:
             return variables.get("STORAGE_ARCHITECTURE")
         return None
 
+    def _extract_network_architecture() -> str | None:
+        hosts_section = parsed.get("hosts", {})
+        extra = hosts_section.get("extra", {}) if isinstance(hosts_section, dict) else {}
+        if isinstance(extra, dict):
+            raw = extra.get("network_architecture")
+            if raw is not None:
+                return raw
+        variables = parsed.get("variables", {}) if isinstance(parsed, dict) else {}
+        if isinstance(variables, dict):
+            return variables.get("NETWORK_ARCHITECTURE")
+        return None
+
     return PlanModel(
         virtual_network=_build_vn(),
         hosts=_build_hosts(),
         mgmt=_build_mgmt(),
         source_file=parsed.get("_meta", {}).get("source_file"),
         storage_architecture=_extract_storage_architecture(),
+        network_architecture=_extract_network_architecture(),
     )
 

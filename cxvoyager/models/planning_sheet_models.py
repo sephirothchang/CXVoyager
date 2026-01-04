@@ -64,4 +64,5 @@ class PlanModel(BaseModel):
     mgmt: Optional[MgmtInfo] = None
     source_file: Optional[str] = None
     storage_architecture: Optional[str] = None
+    network_architecture: Optional[str] = None
 

@@ -1,0 +1,431 @@
+{
+    "platform": "kvm",
+    "cluster_name": "prod123",
+    "dns_server": [
+        "127.0.0.1"
+    ],
+    "vdses": [
+        {
+            "name": "vDS-MGMT-PROD",
+            "bond_mode": "balance-tcp",
+            "hosts_associated": [
+                {
+                    "host_uuid": "6d977b4a-9ba7-11f0-b698-d935a246b994",
+                    "nics_associated": [
+                        "ens224",
+                        "ens192"
+                    ]
+                },
+                {
+                    "host_uuid": "ded7fe08-dc23-11f0-99c3-7f3e094b2708",
+                    "nics_associated": [
+                        "ens224",
+                        "ens192"
+                    ]
+                },
+                {
+                    "host_uuid": "f6e8e2dc-9beb-11f0-a2f4-f96925dc8e16",
+                    "nics_associated": [
+                        "ens224",
+                        "ens192"
+                    ]
+                },
+                {
+                    "host_uuid": "f80b760c-9beb-11f0-9564-1da72e84a9b8",
+                    "nics_associated": [
+                        "ens224",
+                        "ens192"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "vDS-SDS",
+            "bond_mode": "balance-tcp",
+            "hosts_associated": [
+                {
+                    "host_uuid": "6d977b4a-9ba7-11f0-b698-d935a246b994",
+                    "nics_associated": [
+                        "ens256",
+                        "ens161"
+                    ]
+                },
+                {
+                    "host_uuid": "ded7fe08-dc23-11f0-99c3-7f3e094b2708",
+                    "nics_associated": [
+                        "ens256",
+                        "ens161"
+                    ]
+                },
+                {
+                    "host_uuid": "f6e8e2dc-9beb-11f0-a2f4-f96925dc8e16",
+                    "nics_associated": [
+                        "ens256",
+                        "ens161"
+                    ]
+                },
+                {
+                    "host_uuid": "f80b760c-9beb-11f0-9564-1da72e84a9b8",
+                    "nics_associated": [
+                        "ens256",
+                        "ens161"
+                    ]
+                }
+            ]
+        }
+    ],
+    "networks": [
+        {
+            "name": "mgt-network",
+            "attached_vds": "vDS-MGMT-PROD",
+            "network_type": "mgt",
+            "network_config": {
+                "service": [
+                    {
+                        "host_uuid": "6d977b4a-9ba7-11f0-b698-d935a246b994",
+                        "service_interface_name": "port-mgt",
+                        "service_interface_ip": "10.0.20.11",
+                        "netmask": "255.255.255.0"
+                    },
+                    {
+                        "host_uuid": "ded7fe08-dc23-11f0-99c3-7f3e094b2708",
+                        "service_interface_name": "port-mgt",
+                        "service_interface_ip": "10.0.20.12",
+                        "netmask": "255.255.255.0"
+                    },
+                    {
+                        "host_uuid": "f6e8e2dc-9beb-11f0-a2f4-f96925dc8e16",
+                        "service_interface_name": "port-mgt",
+                        "service_interface_ip": "10.0.20.13",
+                        "netmask": "255.255.255.0"
+                    },
+                    {
+                        "host_uuid": "f80b760c-9beb-11f0-9564-1da72e84a9b8",
+                        "service_interface_name": "port-mgt",
+                        "service_interface_ip": "10.0.20.14",
+                        "netmask": "255.255.255.0"
+                    }
+                ],
+                "route": [
+                    {
+                        "gateway": "10.0.20.1"
+                    }
+                ]
+            },
+            "mode": {
+                "type": "vlan_access",
+                "network_identities": [
+                    1020
+                ]
+            }
+        },
+        {
+            "name": "storage-network",
+            "attached_vds": "vDS-SDS",
+            "network_type": "storage",
+            "network_config": {
+                "service": [
+                    {
+                        "host_uuid": "6d977b4a-9ba7-11f0-b698-d935a246b994",
+                        "service_interface_name": "port-storage",
+                        "service_interface_ip": "10.0.21.11",
+                        "netmask": "255.255.255.0"
+                    },
+                    {
+                        "host_uuid": "ded7fe08-dc23-11f0-99c3-7f3e094b2708",
+                        "service_interface_name": "port-storage",
+                        "service_interface_ip": "10.0.21.12",
+                        "netmask": "255.255.255.0"
+                    },
+                    {
+                        "host_uuid": "f6e8e2dc-9beb-11f0-a2f4-f96925dc8e16",
+                        "service_interface_name": "port-storage",
+                        "service_interface_ip": "10.0.21.13",
+                        "netmask": "255.255.255.0"
+                    },
+                    {
+                        "host_uuid": "f80b760c-9beb-11f0-9564-1da72e84a9b8",
+                        "service_interface_name": "port-storage",
+                        "service_interface_ip": "10.0.21.14",
+                        "netmask": "255.255.255.0"
+                    }
+                ]
+            },
+            "mode": {
+                "type": "vlan_access",
+                "network_identities": [
+                    1021
+                ]
+            }
+        }
+    ],
+    "hosts": [
+        {
+            "host_ip": "fe80::250:56ff:feb5:9440%ens162",
+            "host_uuid": "6d977b4a-9ba7-11f0-b698-d935a246b994",
+            "hostname": "n01",
+            "disk_data_with_cache": false,
+            "host_passwords": [
+                {
+                    "user": "root",
+                    "password": "c+G6KvJYsKyQyY4U"
+                },
+                {
+                    "user": "smartx",
+                    "password": "c+G6KvJYsKyQyY4U"
+                }
+            ],
+            "tags": [],
+            "ifaces": [
+                {
+                    "ip": "10.0.20.11",
+                    "function": "mgt"
+                },
+                {
+                    "ip": "10.0.21.11",
+                    "function": "storage"
+                }
+            ],
+            "disks": [
+                {
+                    "drive": "sda",
+                    "function": "cache",
+                    "model": "Virtual_disk",
+                    "serial": "6000c29c84517006c34d1aaf6a21d957",
+                    "size": 644245094400,
+                    "type": "SSD"
+                },
+                {
+                    "drive": "sdb",
+                    "function": "cache",
+                    "model": "Virtual_disk",
+                    "serial": "6000c293608935fed5679277b96e665d",
+                    "size": 644245094400,
+                    "type": "SSD"
+                },
+                {
+                    "drive": "sdd",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "01000000000000000001",
+                    "size": 1099511627776,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sde",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "02000000000000000001",
+                    "size": 1099511627776,
+                    "type": "HDD"
+                }
+            ],
+            "is_master": true,
+            "with_faster_ssd_as_cache": true
+        },
+        {
+            "host_ip": "fe80::250:56ff:feb5:fd55%ens225",
+            "host_uuid": "ded7fe08-dc23-11f0-99c3-7f3e094b2708",
+            "hostname": "n02",
+            "disk_data_with_cache": false,
+            "host_passwords": [
+                {
+                    "user": "root",
+                    "password": "c+G6KvJYsKyQyY4U"
+                },
+                {
+                    "user": "smartx",
+                    "password": "c+G6KvJYsKyQyY4U"
+                }
+            ],
+            "tags": [],
+            "ifaces": [
+                {
+                    "ip": "10.0.20.12",
+                    "function": "mgt"
+                },
+                {
+                    "ip": "10.0.21.12",
+                    "function": "storage"
+                }
+            ],
+            "disks": [
+                {
+                    "drive": "sdb",
+                    "function": "cache",
+                    "model": "Virtual_disk",
+                    "serial": "6000c29d744abbd4a0134dbb543d64f2",
+                    "size": 858993459200,
+                    "type": "SSD"
+                },
+                {
+                    "drive": "sdc",
+                    "function": "cache",
+                    "model": "Virtual_disk",
+                    "serial": "6000c29e67ea5ec2a205ab6f3ae56d95",
+                    "size": 858993459200,
+                    "type": "SSD"
+                },
+                {
+                    "drive": "sdd",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "01000000000000000001",
+                    "size": 1099511627776,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sde",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "02000000000000000001",
+                    "size": 1099511627776,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sdf",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "03000000000000000001",
+                    "size": 1099511627776,
+                    "type": "HDD"
+                }
+            ],
+            "is_master": true,
+            "with_faster_ssd_as_cache": true
+        },
+        {
+            "host_ip": "fe80::250:56ff:feb5:f6be%ens194",
+            "host_uuid": "f6e8e2dc-9beb-11f0-a2f4-f96925dc8e16",
+            "hostname": "n03",
+            "disk_data_with_cache": false,
+            "host_passwords": [
+                {
+                    "user": "root",
+                    "password": "c+G6KvJYsKyQyY4U"
+                },
+                {
+                    "user": "smartx",
+                    "password": "c+G6KvJYsKyQyY4U"
+                }
+            ],
+            "tags": [],
+            "ifaces": [
+                {
+                    "ip": "10.0.20.13",
+                    "function": "mgt"
+                },
+                {
+                    "ip": "10.0.21.13",
+                    "function": "storage"
+                }
+            ],
+            "disks": [
+                {
+                    "drive": "sda",
+                    "function": "cache",
+                    "model": "Virtual_disk",
+                    "serial": "6000c29b7b0f353811b952fa745e833a",
+                    "size": 644245094400,
+                    "type": "SSD"
+                },
+                {
+                    "drive": "sdb",
+                    "function": "cache",
+                    "model": "Virtual_disk",
+                    "serial": "6000c295965f3ac79cffdb968a66aa63",
+                    "size": 644245094400,
+                    "type": "SSD"
+                },
+                {
+                    "drive": "sdd",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "01000000000000000001",
+                    "size": 1099511627776,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sde",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "02000000000000000001",
+                    "size": 1099511627776,
+                    "type": "HDD"
+                }
+            ],
+            "is_master": true,
+            "with_faster_ssd_as_cache": true
+        },
+        {
+            "host_ip": "fe80::250:56ff:feb5:7abf%ens194",
+            "host_uuid": "f80b760c-9beb-11f0-9564-1da72e84a9b8",
+            "hostname": "n04",
+            "disk_data_with_cache": false,
+            "host_passwords": [
+                {
+                    "user": "root",
+                    "password": "c+G6KvJYsKyQyY4U"
+                },
+                {
+                    "user": "smartx",
+                    "password": "c+G6KvJYsKyQyY4U"
+                }
+            ],
+            "tags": [],
+            "ifaces": [
+                {
+                    "ip": "10.0.20.14",
+                    "function": "mgt"
+                },
+                {
+                    "ip": "10.0.21.14",
+                    "function": "storage"
+                }
+            ],
+            "disks": [
+                {
+                    "drive": "sda",
+                    "function": "cache",
+                    "model": "Virtual_disk",
+                    "serial": "6000c2985fb0b1309cbf7790d42b8065",
+                    "size": 644245094400,
+                    "type": "SSD"
+                },
+                {
+                    "drive": "sdb",
+                    "function": "cache",
+                    "model": "Virtual_disk",
+                    "serial": "6000c29081b2a4a5d62472fad75a3e5d",
+                    "size": 644245094400,
+                    "type": "SSD"
+                },
+                {
+                    "drive": "sdd",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "01000000000000000001",
+                    "size": 1099511627776,
+                    "type": "HDD"
+                },
+                {
+                    "drive": "sde",
+                    "function": "data",
+                    "model": "VMware_Virtual_SATA_Hard_Drive",
+                    "serial": "02000000000000000001",
+                    "size": 1099511627776,
+                    "type": "HDD"
+                }
+            ],
+            "is_master": false,
+            "with_faster_ssd_as_cache": true
+        }
+    ],
+    "ntp": {
+        "mode": "internal",
+        "ntp_server": null,
+        "current_time": "2026-01-04T07:49:20.978Z"
+    },
+    "vhost_enabled": true,
+    "rdma_enabled": false
+}

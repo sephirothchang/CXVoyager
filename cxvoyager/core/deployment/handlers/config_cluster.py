@@ -21,6 +21,7 @@ import importlib
 import logging
 import math
 import re
+import socket
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
@@ -252,9 +253,45 @@ def run_config_cluster_stage(ctx_dict):
         stage_logger.warning(tr("deploy.config_cluster.ipmi_missing_skip"))
 
     # === 6. 配置业务虚拟交换机 ===
+    network_arch = _get_network_architecture(parsed_plan)
+    is_storage_independent = "存储独立" in network_arch
+    is_fusion = "三网融合" in network_arch
+
     business_vds_uuid: Optional[str] = None
-    business_vds_payload = _build_business_vds_request_payload(parsed_plan, host_entries, host_info)
-    if business_vds_payload:
+    business_vds_payload = None
+
+    # 三网融合/存储独立：业务网络复用管理 VDS；三网独立：业务网络使用独立 VDS。
+    if is_storage_independent or is_fusion:
+        variables = parsed_plan.get("variables", {}) if isinstance(parsed_plan, dict) else {}
+        mgmt_vds_name = variables.get(plan_vars.MGMT_VDS_NAME.key) if isinstance(variables, dict) else None
+        mgmt_vds_name = mgmt_vds_name or "vDS-MGMT-PROD"
+        candidates = []
+        if mgmt_vds_name:
+            candidates.append(mgmt_vds_name)
+        candidates.extend(["vDS-MGMT-PROD", "VDS-MGT"])
+        seen = set()
+        for candidate in candidates:
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+            business_vds_uuid = _find_vds_uuid_by_name(
+                client,
+                auth_headers,
+                results,
+                candidate,
+                tr("deploy.config_cluster.action_query_biz_vds_detail"),
+            )
+            if business_vds_uuid:
+                stage_logger.info(
+                    "业务网络复用已存在的管理VDS，跳过业务VDS创建",
+                    progress_extra={"vds_uuid": business_vds_uuid, "vds_name": candidate},
+                )
+                break
+
+    if not business_vds_uuid:
+        business_vds_payload = _build_business_vds_request_payload(parsed_plan, host_entries, host_info)
+
+    if business_vds_payload and not business_vds_uuid:
         stage_logger.info(
             tr("deploy.config_cluster.biz_vds_config_start"),
             progress_extra={
@@ -322,7 +359,7 @@ def run_config_cluster_stage(ctx_dict):
                 stage_logger.warning(tr("deploy.config_cluster.biz_vds_missing_uuid_skip"))
         else:
             stage_logger.error(tr("deploy.config_cluster.biz_vds_config_fail"))
-    else:
+    elif not business_vds_uuid:
         stage_logger.warning(tr("deploy.config_cluster.biz_vds_not_ready_skip"))
 
     if business_vds_uuid:
@@ -336,29 +373,35 @@ def run_config_cluster_stage(ctx_dict):
             for payload in business_network_payloads:
                 name = payload.get("name") or "(未命名)"
                 action_desc = tr("deploy.config_cluster.action_create_biz_network", name=name)
-                _send_post_request(
-                    client,
-                    f"/api/v2/network/vds/{business_vds_uuid}/vlans",
-                    payload,
-                    auth_headers,
-                    action_desc,
-                    results,
-                )
-                network_entry = results[-1]
-                if network_entry.get("status") == "ok":
-                    success += 1
-                    stage_logger.info(
-                        tr("deploy.config_cluster.biz_network_create_success"),
-                        progress_extra={"name": name, "vlan_id": payload.get("vlan_id")},
+                try:
+                    _send_post_request(
+                        client,
+                        f"/api/v2/network/vds/{business_vds_uuid}/vlans",
+                        payload,
+                        auth_headers,
+                        action_desc,
+                        results,
                     )
-                else:
+                    network_entry = results[-1]
+                    if network_entry.get("status") == "ok":
+                        success += 1
+                        stage_logger.info(
+                            tr("deploy.config_cluster.biz_network_create_success"),
+                            progress_extra={"name": name, "vlan_id": payload.get("vlan_id")},
+                        )
+                    else:
+                        stage_logger.warning(
+                            tr("deploy.config_cluster.biz_network_create_fail"),
+                            progress_extra={
+                                "name": name,
+                                "vlan_id": payload.get("vlan_id"),
+                                "error": network_entry.get("error"),
+                            },
+                        )
+                except Exception as exc:  # noqa: BLE001
                     stage_logger.warning(
-                        tr("deploy.config_cluster.biz_network_create_fail"),
-                        progress_extra={
-                            "name": name,
-                            "vlan_id": payload.get("vlan_id"),
-                            "error": network_entry.get("error"),
-                        },
+                        "创建业务网络异常，继续下一条",
+                        progress_extra={"name": name, "error": str(exc)},
                     )
             stage_logger.info(
                 tr("deploy.config_cluster.biz_network_create_done"),
@@ -588,6 +631,60 @@ def _load_fisheye_credentials(parsed_plan: Any) -> tuple[str, str]:
     return default_user, default_password
 
 
+def _get_network_architecture(parsed_plan: Any) -> str:
+    default_arch = "三网独立"
+    if not isinstance(parsed_plan, dict):
+        return default_arch
+    hosts_section = parsed_plan.get("hosts", {})
+    extra = hosts_section.get("extra", {}) if isinstance(hosts_section, dict) else {}
+    raw = extra.get("network_architecture")
+    if not raw:
+        variables = parsed_plan.get("variables", {})
+        if isinstance(variables, dict):
+            raw = variables.get(plan_vars.NETWORK_ARCHITECTURE.key)
+    text = str(raw).strip() if raw is not None else ""
+    return text or default_arch
+
+
+def _find_vds_uuid_by_name(
+    client: APIClient,
+    headers: Dict[str, str],
+    results: List[Dict[str, Any]],
+    name: str,
+    description: str,
+) -> Optional[str]:
+    if not name:
+        return None
+    response = _fetch_json_response(client, "/api/v2/network/vds", headers, description, results)
+
+    def _iter_items(payload: Any):
+        if isinstance(payload, list):
+            return payload
+        if isinstance(payload, dict):
+            for key in ("data", "items", "list", "results"):
+                if isinstance(payload.get(key), list):
+                    return payload.get(key)
+        return []
+
+    candidates = []
+    if isinstance(response, dict):
+        candidates = _iter_items(response) or _iter_items(response.get("data"))
+    elif isinstance(response, list):
+        candidates = response
+
+    target = str(name).strip().lower()
+    for item in candidates:
+        if not isinstance(item, dict):
+            continue
+        item_name = str(item.get("name") or "").strip().lower()
+        if item_name != target:
+            continue
+        uuid = item.get("uuid") or item.get("id")
+        if uuid:
+            return str(uuid)
+    return None
+
+
 def _resolve_cluster_vip(plan: Any, parsed_plan: Any) -> Optional[str]:
     if getattr(plan, 'hosts', None):
         for host in plan.hosts:
@@ -595,11 +692,15 @@ def _resolve_cluster_vip(plan: Any, parsed_plan: Any) -> Optional[str]:
             if vip:
                 return str(vip)
     if isinstance(parsed_plan, dict):
-        host_records = parsed_plan.get('hosts', {}).get('records', [])
-        for record in host_records:
-            vip = record.get('集群VIP')
-            if vip:
-                return str(vip)
+        hosts_section = parsed_plan.get('hosts', {})
+        if isinstance(hosts_section, dict):
+            host_records = hosts_section.get('records', []) if isinstance(hosts_section, dict) else []
+            for record in host_records or []:
+                if not isinstance(record, dict):
+                    continue
+                vip = record.get('集群VIP')
+                if vip:
+                    return str(vip)
     return None
 
 
@@ -945,15 +1046,22 @@ def _update_host_login_passwords(stage_logger, host_entries: List[Dict[str, Any]
         stage_logger.info(tr("deploy.config_cluster.password_update_disabled"))
         return {"action": "批量更新主机密码", "status": "skipped", "reason": "disabled"}
 
-    DEFAULT_PASSWORD = "HC!r0cks"
+    INIT_DEFAULT_PASSWORD = "P@ssw0rd!123"  # 集群初始化阶段 root/smartx 默认口令
+    FALLBACK_TARGET_PASSWORD = "HC!r0cks"
     jobs_map: Dict[str, Dict[str, Any]] = {}
     for entry in host_entries:
         mgmt_ip = entry.get('mgmt_ip')
         if not mgmt_ip:
             continue
-        target_password = entry.get('ssh_password') or host_cfg.get('target_password') or DEFAULT_PASSWORD
+        # 目标密码：优先规划表主机 SSH 密码；缺失或无效则告警并回落到默认口令
+        plan_pwd_raw = entry.get('ssh_password')
+        target_password = str(plan_pwd_raw).strip() if plan_pwd_raw else ""
         if not target_password:
-            continue
+            stage_logger.warning(
+                "规划表未提供主机 SSH 密码，回落默认口令",
+                progress_extra={"host": mgmt_ip, "fallback": FALLBACK_TARGET_PASSWORD},
+            )
+            target_password = FALLBACK_TARGET_PASSWORD
         login_user = host_cfg.get('login_user') or 'smartx'
         if str(login_user).lower() != 'smartx':
             stage_logger.warning(
@@ -961,7 +1069,9 @@ def _update_host_login_passwords(stage_logger, host_entries: List[Dict[str, Any]
                 progress_extra={"host": mgmt_ip, "login_user": login_user},
             )
             login_user = 'smartx'
-        login_password = host_cfg.get('login_password') or entry.get('ssh_password') or DEFAULT_PASSWORD
+        # 登录密码：使用集群初始化默认口令，允许通过配置覆盖
+        login_password = host_cfg.get('login_password') or INIT_DEFAULT_PASSWORD
+        # root 目标密码：默认与目标密码一致，可被配置覆盖
         root_password = host_cfg.get('root_password') or target_password
         jobs_map[mgmt_ip] = {
             "host": mgmt_ip,
@@ -1055,34 +1165,52 @@ def _change_password_via_ssh(job: Dict[str, Any], timeout: int, paramiko_module)
     client.set_missing_host_key_policy(paramiko_module.AutoAddPolicy())
 
     try:
-        client.connect(host, username=username, password=login_password, timeout=timeout)
+        client.connect(
+            hostname=host,
+            username=username,
+            password=login_password,
+            timeout=timeout,
+            auth_timeout=timeout,
+            banner_timeout=timeout,
+            look_for_keys=False,
+            allow_agent=False,
+        )
 
-        lines = [f"{username}:{target_password}"]
-        if update_root and username != 'root':
-            lines.append(f"root:{root_password}")
-        elif update_root and username == 'root':
-            root_password = target_password
-        payload = "\n".join(lines)
+        transport = client.get_transport()
+        if transport:
+            transport.set_keepalive(15)
 
-        if username == 'root':
-            command = "/usr/sbin/chpasswd"
-            stdin_prefix = ""
-        else:
-            command = "sudo -S /usr/sbin/chpasswd"
-            stdin_prefix = f"{login_password}\n"
+        accounts_to_update = [(username, target_password)]
+        if update_root:
+            accounts_to_update.append(("root", root_password))
 
-        stdin, stdout, stderr = client.exec_command(command, get_pty=True)
-        stdin.write(f"{stdin_prefix}{payload}\n")
-        stdin.flush()
-        if not stdin.channel.closed:
-            stdin.channel.shutdown_write()
+        for account, new_password in accounts_to_update:
+            # 通过 shell 管道传递账号:密码，使用单引号包裹
+            payload = f"{account}:{new_password}"
+            command = f"echo '{payload}' | sudo -n /usr/sbin/chpasswd"
 
-        exit_status = stdout.channel.recv_exit_status()
-        if exit_status != 0:
-            err_text = stderr.read().decode('utf-8', 'ignore').strip()
-            raise RuntimeError(f"{host}: chpasswd exited with {exit_status} ({err_text or 'no stderr'})")
+            stdin, stdout, stderr = client.exec_command(command, get_pty=True, timeout=timeout)
+            channel = stdout.channel
+            channel.settimeout(timeout)
+
+            deadline = time.monotonic() + timeout
+            while not channel.exit_status_ready():
+                if time.monotonic() > deadline:
+                    raise RuntimeError(
+                        f"{host}: SSH password update for {account} timed out after {timeout}s (command still running)"
+                    )
+                time.sleep(0.2)
+
+            exit_status = channel.recv_exit_status()
+            if exit_status != 0:
+                err_text = stderr.read().decode('utf-8', 'ignore').strip()
+                raise RuntimeError(
+                    f"{host}: chpasswd for {account} exited with {exit_status} ({err_text or 'no stderr'})"
+                )
 
         return {"host": host, "status": "ok"}
+    except socket.timeout as exc:
+        raise RuntimeError(f"{host}: SSH password update timed out after {timeout}s") from exc
     finally:
         try:
             client.close()

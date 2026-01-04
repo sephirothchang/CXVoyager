@@ -188,6 +188,28 @@ class DeploymentPayloadGenerator:
 
         return info
 
+    def _extract_vlan_id(self, labels: List[str]) -> int:
+        """从规划表派生网络中获取指定标签的 VLAN ID。"""
+        derived = self.parsed_plan.get("_derived_network", {}) if isinstance(self.parsed_plan, dict) else {}
+        networks = derived.get("networks", []) if isinstance(derived, dict) else []
+        normalized_labels = {str(label).strip().lower() for label in labels if label}
+        for entry in networks:
+            if not isinstance(entry, dict):
+                continue
+            meta = entry.get("metadata") or {}
+            label_raw = meta.get("type")
+            label = str(label_raw).strip().lower() if label_raw is not None else ""
+            if normalized_labels and label not in normalized_labels:
+                continue
+            vlan_raw = meta.get("vlan_id")
+            if vlan_raw is None:
+                continue
+            try:
+                return int(vlan_raw)
+            except Exception:
+                continue
+        return 0
+
     def _extract_vds_roles(self) -> Dict[str, str]:
         records_section = self.parsed_plan.get("virtual_network", {}) if isinstance(self.parsed_plan, dict) else {}
         records = records_section.get("records", []) if isinstance(records_section, dict) else []
@@ -258,9 +280,22 @@ class DeploymentPayloadGenerator:
 
     def _resolve_vds_name_for_role(self, role: str, default: str) -> str:
         return self._vds_role_to_name.get(role) or default
+
+    def _network_architecture(self) -> str:
+        raw = getattr(self.plan, "network_architecture", None)
+        if not raw:
+            return "三网独立"
+        text = str(raw).strip()
+        if not text:
+            return "三网独立"
+        return text
     
     def _build_vdses(self) -> List[Dict[str, Any]]:
         """构建虚拟分布式交换机(VDS)配置"""
+
+        arch = self._network_architecture()
+        is_storage_independent = "存储独立" in arch
+        is_fusion = "三网融合" in arch
 
         derived_network = self.parsed_plan.get("_derived_network", {}) if isinstance(self.parsed_plan, dict) else {}
         raw_vdses_config = derived_network.get("vdses", []) if isinstance(derived_network, dict) else []
@@ -272,7 +307,7 @@ class DeploymentPayloadGenerator:
         host_uuids, host_fallback_nics = self._collect_host_uuid_info()
 
         role_order = {"mgmt": 0, "storage": 1}
-        allowed_roles = set(role_order)
+        allowed_roles = {"mgmt", "storage"}
         selected_entries: List[Tuple[str, Dict[str, Any]]] = []
         self._vds_role_to_name = {}
 
@@ -293,8 +328,10 @@ class DeploymentPayloadGenerator:
         if not selected_entries:
             logger.warning(tr("deploy.payload_builder.default_vds"))
 
+        mgmt_default_name = "vDS-MGMT-PROD" if is_storage_independent else "VDS-MGT"
+
         defaults = {
-            "mgmt": {"name": "VDS-MGT", "bond_mode": "active-backup"},
+            "mgmt": {"name": mgmt_default_name, "bond_mode": "active-backup"},
             "storage": {"name": "VDS-SDS", "bond_mode": "active-backup"},
         }
         for role, default_cfg in defaults.items():
@@ -339,6 +376,9 @@ class DeploymentPayloadGenerator:
                 "hosts_associated": hosts_associated,
             })
 
+        if is_fusion:
+            logger.warning("三网融合模式暂未实现，保持默认 VDS 拆分，后续完善 TODO")
+
         return vdses
     
     def _build_networks(self) -> List[Dict[str, Any]]:
@@ -363,7 +403,8 @@ class DeploymentPayloadGenerator:
         service_configs = []
         gateway = None
         netmask = None
-        vlan_id = 0
+        # 只使用默认管理网络的 VLAN（F4），忽略额外管理网络（F5）
+        vlan_id = self._extract_vlan_id(["default", "default_mgmt", "mgmt"])
         
         for host in self.plan.hosts:
             mgmt_ip = str(host.管理地址) if host.管理地址 else None
@@ -388,8 +429,8 @@ class DeploymentPayloadGenerator:
                     if netmask is None:
                         netmask = getattr(host, "管理网络子网掩码", "255.255.255.0")
                     
-                    # TODO: 从规划表获取VLAN ID
-                    vlan_id = getattr(host, "管理网络VLAN", 0) or 0
+                    if not vlan_id:
+                        vlan_id = getattr(host, "管理网络VLAN", 0) or 0
         
         if not service_configs:
             return None
@@ -432,7 +473,7 @@ class DeploymentPayloadGenerator:
     def _build_storage_network(self) -> Optional[Dict[str, Any]]:
         """构建存储网络配置"""
         service_configs = []
-        vlan_id = 0
+        vlan_id = self._extract_vlan_id(["storage"])
         
         for host in self.plan.hosts:
             mgmt_ip = str(host.管理地址) if host.管理地址 else None
@@ -450,8 +491,8 @@ class DeploymentPayloadGenerator:
                         "netmask": getattr(host, "存储网络子网掩码", "255.255.255.0")
                     })
                     
-                    # TODO: 从规划表获取存储网络VLAN ID
-                    vlan_id = getattr(host, "存储网络VLAN", 0) or 0
+                    if not vlan_id:
+                        vlan_id = getattr(host, "存储网络VLAN", 0) or 0
         
         if not service_configs:
             return None
@@ -496,7 +537,7 @@ class DeploymentPayloadGenerator:
         
         # 构建主机密码配置
         host_passwords = [
-            {"user": "root", "password": "c+G6KvJYsKyQyY4U"},  # 固定加密密码
+            {"user": "root", "password": "c+G6KvJYsKyQyY4U"},  # 固定密码为P@ssw0rd!123
             {"user": "smartx", "password": "c+G6KvJYsKyQyY4U"}
         ]
         
