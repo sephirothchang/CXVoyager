@@ -37,7 +37,7 @@ def _print_menu() -> None:
     print("\n=== " + _t("CXVoyager 交互入口", "CXVoyager Entry") + " ===")
     print("1) " + _t("CLI 模式 (CXVoyager CLI)", "CLI Mode (CXVoyager CLI)"))
     print("2) " + _t("Web UI 模式 (CXVoyager Web Console)", "Web UI Mode (CXVoyager Web Console)"))
-    print("3) " + _t("安装依赖（离线包）", "Install deps (offline)") )
+    print("3) " + _t("重新安装依赖（离线包）", "Reinstall deps (offline)") )
     print("0) " + _t("退出", "Exit"))
 
 

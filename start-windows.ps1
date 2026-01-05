@@ -1,8 +1,9 @@
+﻿& cmd /c 'chcp 65001 >nul'
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
-Write-Host "启动 CXVoyager 启动脚本 (Windows)..."
+[Console]::WriteLine("启动 CXVoyager 启动脚本 (Windows)...")
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $venvDir = Join-Path $scriptDir ".venv"
@@ -32,13 +33,13 @@ function Ensure-Python {
 				Write-Error "找不到 Python 安装包: $pythonInstaller"
 				exit 1
 			}
-			Write-Host "正在安装 $requiredPythonVersion ..."
+			[Console]::WriteLine("正在安装 $requiredPythonVersion ...")
 			$targetDir = Join-Path $env:LOCALAPPDATA "Programs\Python\Python311"
 			$arguments = "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1 TargetDir=`"$targetDir`""
 			Start-Process -FilePath $pythonInstaller -ArgumentList $arguments -Wait
 			$cmd = Join-Path $targetDir "python.exe"
 		} else {
-			Write-Host "使用系统 Python: $detected"
+			[Console]::WriteLine("使用系统 Python: $detected")
 		}
 	}
 	return $cmd
@@ -46,13 +47,13 @@ function Ensure-Python {
 
 $basePython = Ensure-Python
 $basePythonVersion = Get-PythonVersion $basePython
-Write-Host "使用 Python $basePythonVersion ($basePython)"
+[Console]::WriteLine("使用 Python $basePythonVersion ($basePython)")
 
 # Prepare offline packages if requirements changed
 $offlineStampFile = Join-Path $scriptDir ".offline_packages.sha256"
 $reqHash = (Get-FileHash $reqFile -Algorithm SHA256).Hash
 if (-not (Test-Path $offlineStampFile) -or ((Get-Content $offlineStampFile -ErrorAction SilentlyContinue) -ne $reqHash)) {
-	Write-Host "准备离线安装包..."
+	[Console]::WriteLine("准备离线安装包...")
 	& $basePython "$scriptDir\scripts\prepare_offline_installation_packages.py"
 	$reqHash | Set-Content $offlineStampFile
 }
@@ -66,7 +67,7 @@ function Install-Requirements {
 	if (Test-Path $stampFile) {
 		$saved = Get-Content $stampFile -ErrorAction SilentlyContinue | Select-Object -First 1
 		if ($saved -eq $reqHash) {
-			Write-Host "依赖未变化，跳过安装"
+			[Console]::WriteLine("依赖未变化，跳过安装")
 			return
 		}
 	}
@@ -74,7 +75,7 @@ function Install-Requirements {
 	$hasOffline = (Test-Path $offlineDir) -and (Get-ChildItem -Path $offlineDir -File -ErrorAction SilentlyContinue | Select-Object -First 1)
 	if ($hasOffline) {
 		try {
-			Write-Host "使用离线包安装依赖..."
+			[Console]::WriteLine("使用离线包安装依赖...")
 			& $pythonExe -m pip install --no-index --find-links $offlineDir -r $reqFile
 			$reqHash | Set-Content $stampFile
 			return
@@ -82,17 +83,17 @@ function Install-Requirements {
 			Write-Warning "离线依赖安装失败，尝试联网安装..."
 		}
 	} else {
-		Write-Host "未找到离线依赖，尝试联网安装..."
+		[Console]::WriteLine("未找到离线依赖，尝试联网安装...")
 	}
 
-	Write-Host "使用联网安装依赖..."
+	[Console]::WriteLine("使用联网安装依赖...")
 	& $pythonExe -m pip install --no-cache-dir -r $reqFile
 	$reqHash | Set-Content $stampFile
 }
 
 # Create venv if missing
 if (-not (Test-Path $pythonExe)) {
-	Write-Host "创建虚拟环境..."
+	[Console]::WriteLine("创建虚拟环境...")
 	& $basePython -m venv $venvDir
 }
 
