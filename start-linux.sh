@@ -8,10 +8,12 @@ REQ_FILE="$SCRIPT_DIR/requirements.txt"
 OFFLINE_DIR="$SCRIPT_DIR/cxvoyager/common/resources/offline_packages"
 REQ_STAMP="$VENV_DIR/.requirements.sha256"
 
-# Prepare offline packages if needed
-if [ ! -d "$OFFLINE_DIR" ] || [ -z "$(ls -A "$OFFLINE_DIR" 2>/dev/null)" ]; then
+# Prepare offline packages if requirements changed
+OFFLINE_STAMP="$SCRIPT_DIR/.offline_packages.sha256"
+if [ ! -f "$OFFLINE_STAMP" ] || [ "$(cat "$OFFLINE_STAMP")" != "$(sha256sum "$REQ_FILE" | awk '{print $1}')" ]; then
   echo "准备离线安装包..."
   python3 "$SCRIPT_DIR/scripts/prepare_offline_installation_packages.py"
+  sha256sum "$REQ_FILE" | awk '{print $1}' > "$OFFLINE_STAMP"
 fi
 
 install_requirements() {
