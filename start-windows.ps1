@@ -22,7 +22,7 @@ function Get-PythonVersion([string]$pythonCmd) {
 	}
 }
 
-function Ensure-Python {
+function Compare-Python {
 	param([string]$preferred = "python")
 	$cmd = $preferred
 	$detected = Get-PythonVersion $cmd
@@ -45,7 +45,7 @@ function Ensure-Python {
 	return $cmd
 }
 
-$basePython = Ensure-Python
+$basePython = Compare-Python
 $basePythonVersion = Get-PythonVersion $basePython
 [Console]::WriteLine("使用 Python $basePythonVersion ($basePython)")
 

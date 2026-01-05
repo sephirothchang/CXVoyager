@@ -83,7 +83,7 @@ CLOUDTOWER_VOLUME_ENDPOINT = "/api/v2/images/upload/volume"  # 创建 CloudTower
 CLOUDTOWER_UPLOAD_ENDPOINT = "/api/v2/images/upload"  # 上传 CloudTower ISO 分片。
 CLOUDTOWER_DELETE_ENDPOINT = "/api/v2/images/{image_uuid}"  # 删除 CloudTower ISO 上传卷。
 CLOUDTOWER_CLUSTER_POLL_INTERVAL = 10  # 轮询集群关联状态的默认间隔。
-CLOUDTOWER_CLUSTER_POLL_TIMEOUT = 15 * 60  # 集群关联状态轮询总超时，默认 15 分钟。
+CLOUDTOWER_CLUSTER_POLL_TIMEOUT = 10 * 60  # 集群关联状态轮询总超时，默认 15 分钟。
 CLOUDTOWER_DEFAULT_DATACENTER_NAME = "SMTX-HCI-DC"  # 数据中心默认名称。
 CLOUDTOWER_DEFAULT_ORGANIZATION_NAME = "SMTX-HCI"  # 组织默认名称。
 CLOUDTOWER_VM_READY_INTERVAL = 10  # 虚拟机 Guest OS 轮询间隔（秒）。
@@ -222,6 +222,7 @@ class CloudTowerDeploymentPlan:
     ssh: CloudTowerSSHConfig = field(default_factory=CloudTowerSSHConfig)
     cloudtower_ip: Optional[str] = None  # CloudTower 服务最终访问 IP。
     iso_summary: Dict[str, Any] = field(default_factory=dict)  # ISO 上传摘要信息。
+    dns_servers: List[str] = field(default_factory=list)  # 规划表或配置中的 DNS 服务器列表。
     additional_headers: Dict[str, str] = field(default_factory=dict)  # 补充的请求头，例如重写 token。
 
 
@@ -383,6 +384,13 @@ def handle_deploy_cloudtower(ctx_dict):
             stage_logger=stage_logger,
         )
 
+        deployment_plan.dns_servers = _resolve_dns_servers(
+            plan=plan,
+            parsed_plan=parsed_plan,
+            config_data=cfg_dict,
+            stage_logger=stage_logger,
+        )
+
         raise_if_aborted(ctx_dict, stage_logger=stage_logger, hint="创建 CloudTower 虚拟机")
         _deploy_cloudtower_virtual_machine(
             ctx=ctx,
@@ -395,7 +403,6 @@ def handle_deploy_cloudtower(ctx_dict):
 
         raise_if_aborted(ctx_dict, stage_logger=stage_logger, hint="部署 CloudTower 服务")
         _install_and_verify_cloudtower_services(
-            ctx=ctx,
             deployment_plan=deployment_plan,
             stage_logger=stage_logger,
         )
@@ -952,6 +959,46 @@ def _assemble_cloudtower_deployment_plan(
     )
 
     return deployment_plan
+
+
+def _resolve_dns_servers(
+    *,
+    plan: Optional[PlanModel],
+    parsed_plan: Optional[Dict[str, Any]],
+    config_data: Dict[str, Any],
+    stage_logger: LoggerAdapter,
+) -> List[str]:
+    """从规划表或配置中解析 DNS 服务器地址列表。"""
+
+    servers: List[str] = []
+    seen: set[str] = set()
+
+    def _extend(raw: Any, source: str) -> None:
+        for item in _normalize_server_list(raw):
+            value = str(item).strip()
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            servers.append(value)
+            stage_logger.debug(
+                "解析到 DNS 服务器条目",
+                progress_extra={"source": source, "dns": value},
+            )
+
+    mgmt_model = getattr(plan, "mgmt", None)
+    if mgmt_model is not None:
+        for attr in ("DNS服务器", "DNS_服务器", "DNS服务器列表", "DNS", "dns_servers"):
+            _extend(getattr(mgmt_model, attr, None), f"plan.mgmt.{attr}")
+
+    _extend(_extract_mgmt_value(parsed_plan, "DNS 服务器"), "parsed_plan.mgmt")
+
+    cloud_cfg = config_data.get("cloudtower", {}) if isinstance(config_data, dict) else {}
+    _extend(cloud_cfg.get("dns_servers"), "config.cloudtower.dns_servers")
+
+    if not servers:
+        stage_logger.warning("未从规划表或配置中解析到 DNS 服务器，写入 /etc/resolv.conf 将被跳过")
+
+    return servers
 
 
 def _resolve_cloudtower_ip(
@@ -1833,7 +1880,6 @@ def _extract_data_list(response: Any) -> List[Dict[str, Any]]:
 
 def _install_and_verify_cloudtower_services(
     *,
-    ctx: RunContext,
     deployment_plan: CloudTowerDeploymentPlan,
     stage_logger: LoggerAdapter,
 ) -> None:
@@ -1872,15 +1918,6 @@ def _install_and_verify_cloudtower_services(
             password=deployment_plan.ssh.password,
             timeout=deployment_plan.ssh.timeout,
         )
-        stage_logger.debug(tr("deploy.deploy_cloudtower.ssh_log_connected"), progress_extra={"ip": target_ip})
-
-        monitor_executor = ThreadPoolExecutor(max_workers=1)
-        monitor_future = monitor_executor.submit(
-            _wait_for_installation_success,
-            ssh_client=log_ssh_client,
-            ssh_config=deployment_plan.ssh,
-            stage_logger=stage_logger,
-        )
 
         _run_sudo_command(
             ssh_client=ssh_client,
@@ -1890,26 +1927,22 @@ def _install_and_verify_cloudtower_services(
             stage_logger=stage_logger,
         )
 
-        # Configure DNS servers in resolv.conf
-        dns_servers = _extract_dns_servers(ctx, stage_logger)
-        if dns_servers:
-            dns_commands = ["echo '# DNS servers configured by CXVoyager AutoDeploy Platform' >> /etc/resolv.conf"]
-            for dns in dns_servers:
-                dns_commands.append(f"echo 'nameserver {dns}' >> /etc/resolv.conf")
-            full_dns_command = " && ".join(dns_commands)
-            try:
-                _run_sudo_command(
-                    ssh_client=ssh_client,
-                    ssh_config=deployment_plan.ssh,
-                    command=full_dns_command,
-                    description="配置 DNS 服务器",
-                    stage_logger=stage_logger,
-                )
-            except Exception as exc:
-                stage_logger.warning(
-                    "配置 DNS 服务器失败，继续安装",
-                    progress_extra={"error": str(exc)},
-                )
+        _write_dns_servers_to_resolv_conf(
+            ssh_client=ssh_client,
+            ssh_config=deployment_plan.ssh,
+            dns_servers=deployment_plan.dns_servers,
+            stage_logger=stage_logger,
+        )
+
+        stage_logger.debug(tr("deploy.deploy_cloudtower.ssh_log_connected"), progress_extra={"ip": target_ip})
+
+        monitor_executor = ThreadPoolExecutor(max_workers=1)
+        monitor_future = monitor_executor.submit(
+            _wait_for_installation_success,
+            ssh_client=log_ssh_client,
+            ssh_config=deployment_plan.ssh,
+            stage_logger=stage_logger,
+        )
 
         _run_sudo_command(
             ssh_client=ssh_client,
@@ -2061,6 +2094,31 @@ def _run_sudo_command(
             progress_extra={"command": command},
         )
 
+def _write_dns_servers_to_resolv_conf(
+    *,
+    ssh_client,
+    ssh_config: CloudTowerSSHConfig,
+    dns_servers: List[str],
+    stage_logger: LoggerAdapter,
+) -> None:
+    """将 DNS 服务器地址写入 /etc/resolv.conf。"""
+
+    servers = [str(item).strip() for item in dns_servers if str(item).strip()]
+    if not servers:
+        return
+
+    content = [f"nameserver {server}" for server in servers]
+    args = " ".join(shlex.quote(line) for line in content)
+    # 使用 sudo 执行 sh -c，确保重定向在 root 权限下完成。
+    command = f"sh -c \"printf '%s\\n' {args} > /etc/resolv.conf\""
+
+    _run_sudo_command(
+        ssh_client=ssh_client,
+        ssh_config=ssh_config,
+        command=command,
+        description="写入 /etc/resolv.conf",
+        stage_logger=stage_logger,
+    )
 
 def _wait_for_installation_success(
     *,
@@ -2251,12 +2309,6 @@ def _configure_cloudtower_post_install(
             stage_logger=stage_logger,
             servers=inputs.ntp_servers,
         )
-    if inputs.dns_servers:
-        _update_cloudtower_dns_via_ssh(
-            deployment_plan=deployment_plan,
-            dns_servers=inputs.dns_servers,
-            stage_logger=stage_logger,
-        )
 
     license_info = _cloudtower_query_license(client=client, stage_logger=stage_logger)
 
@@ -2367,26 +2419,7 @@ def _resolve_cloudtower_setup_inputs(
     )
 
 
-def _extract_dns_servers(ctx: RunContext, stage_logger: LoggerAdapter) -> List[str]:
-    """从规划表或配置中提取 DNS 服务器列表。"""
-    plan = ctx.plan
-    parsed_plan = ctx.extra.get('parsed_plan') if isinstance(ctx.extra, dict) else None
-    config_data = ctx.extra.get('config') if isinstance(ctx.extra, dict) else {}
-    cloud_cfg = dict(config_data.get("cloudtower", {}) or {})
-
-    mgmt_model = getattr(plan, "mgmt", None)
-    dns_servers = _normalize_server_list(
-        getattr(mgmt_model, "DNS服务器", None)
-        or _extract_mgmt_value(parsed_plan, "DNS 服务器")
-        or cloud_cfg.get("dns_servers")
-        or CLOUDTOWER_DEFAULT_DNS_SERVERS
-    )
-
-    stage_logger.debug(
-        "提取 DNS 服务器",
-        progress_extra={"dns_servers": dns_servers},
-    )
-    return dns_servers
+def _extract_mgmt_value(parsed_plan: Any, key: str) -> Any:
     if not isinstance(parsed_plan, dict):
         return None
     mgmt = parsed_plan.get("mgmt")
@@ -2600,63 +2633,6 @@ def _post_cloudtower_graphql(
             raise RuntimeError(f"{description}失败: {messages}")
     return response.get("data", {}) if isinstance(response, dict) else {}
 
-
-def _update_cloudtower_dns_via_ssh(
-    *,
-    deployment_plan: CloudTowerDeploymentPlan,
-    dns_servers: List[str],
-    stage_logger: LoggerAdapter,
-) -> None:
-    target_ip = deployment_plan.cloudtower_ip or deployment_plan.network.ip_address
-    if not target_ip:
-        stage_logger.warning(tr("deploy.deploy_cloudtower.dns_skip_no_ip"))
-        return
-    if not dns_servers:
-        return
-
-    stage_logger.info(
-        tr("deploy.deploy_cloudtower.dns_update"),
-        progress_extra={"ip": target_ip, "servers": dns_servers},
-    )
-
-    try:
-        paramiko = importlib.import_module("paramiko")
-    except ImportError as exc:  # pragma: no cover
-        raise RuntimeError("缺少 paramiko 依赖，请先安装后重试：pip install paramiko") from exc
-
-    ssh_client = paramiko.SSHClient()
-    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-    try:
-        try:
-            ssh_client.connect(
-                target_ip,
-                port=deployment_plan.ssh.port,
-                username=deployment_plan.ssh.username,
-                password=deployment_plan.ssh.password,
-                timeout=deployment_plan.ssh.timeout,
-            )
-            content = "\n".join(f"nameserver {server}" for server in dns_servers)
-            # 使用 printf + tee，避免在命令内重复使用 sudo 和 heredoc 导致密码/stdin 交互冲突。
-            args = " ".join(shlex.quote(line) for line in content.splitlines())
-            command = f"printf '%s\\n' {args} | tee /etc/resolv.conf >/dev/null"
-            _run_sudo_command(
-                ssh_client=ssh_client,
-                ssh_config=deployment_plan.ssh,
-                command=command,
-                description="写入 /etc/resolv.conf",
-                stage_logger=stage_logger,
-            )
-        except Exception as exc:  # noqa: BLE001 - DNS 写入失败不应阻断流程
-            stage_logger.warning(
-                tr("deploy.deploy_cloudtower.dns_update_failed"),
-                progress_extra={"ip": target_ip, "servers": dns_servers, "error": str(exc)},
-            )
-    finally:
-        try:
-            ssh_client.close()
-        except Exception:  # noqa: BLE001
-            pass
 
 def _resolve_iso_path(ctx: RunContext, cfg: Dict[str, Any]) -> tuple[Path, Dict[str, Any]]:
     iso_cfg = cfg.get('cloudtower', {}) if isinstance(cfg, dict) else {}
