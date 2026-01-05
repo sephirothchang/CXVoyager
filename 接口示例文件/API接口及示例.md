@@ -2758,7 +2758,7 @@ x-smartx-token：d513e36581044eb691ba9589eebac995
         }
     }
 }
-
+  
   ### 关联Cloudtower系统服务
   请求网址
   https://10.0.20.2/api
@@ -2802,6 +2802,29 @@ x-smartx-token：d513e36581044eb691ba9589eebac995
     }
 }
 
+  ### 启用流量可视化
+  请求网址
+  https://10.0.20.2/api
+  请求方法
+  POST
+  
+  header
+  cookie
+  path=/; path=/; connect.sid=s%3Acmk18ppik01zd7tud4eg7hfc4.MVGam6iNJt9W8FOQ%2FXtaAucf81zrhNrZD7TWLs0dZlM
+
+
+  载荷（37qG2mR3LV5TG6K10skO1fLjDEp是在关联集群时返回的"connected_clusters": "id": "37qG2mR3LV5TG6K10skO1fLjDEp",）
+  {"operationName":"updateObservabilityConnectedClusterTrafficEnabled","variables":{"where":{"id":"37qG2mR3LV5TG6K10skO1fLjDEp"},"data":{"traffic_enabled":true}},"query":"mutation updateObservabilityConnectedClusterTrafficEnabled($where: ObservabilityConnectedClusterUpdateWhereInput!, $data: ObservabilityConnectedClusterUpdateInput!) {\n  updateObservabilityConnectedClusterTrafficEnabled(where: $where, data: $data) {\n    id\n    __typename\n  }\n}\n"}
+
+  响应
+  {
+    "data": {
+        "updateObservabilityConnectedClusterTrafficEnabled": {
+            "id": "37qG2mR3LV5TG6K10skO1fLjDEp",
+            "__typename": "ObservabilityConnectedCluster"
+        }
+    }
+  }
 
 
   ## 部署备份

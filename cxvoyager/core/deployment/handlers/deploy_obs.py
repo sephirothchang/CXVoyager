@@ -44,7 +44,7 @@ DEFAULT_TASK_WAIT_TIMEOUT = 900  # seconds
 DEFAULT_TASK_POLL_INTERVAL = 5  # seconds
 DEFAULT_INSTANCE_WAIT_TIMEOUT = 1800  # seconds
 DEFAULT_INSTANCE_POLL_INTERVAL = 10  # seconds
-DEFAULT_OBS_SSH_PORT = 22
+DEFAULT_OBS_SSH_PORT = 10022
 DEFAULT_OBS_SSH_TIMEOUT = 10
 DEFAULT_OBS_SSH_USERNAME = "o11y"
 DEFAULT_OBS_SSH_PASSWORD = "HC!r0cks"
@@ -1241,24 +1241,26 @@ def _update_obs_dns_and_restart(
 
     result = {"ip": vm_ip, "dns_servers": dns_servers}
     try:
+        # Always clear default DNS to avoid interference
+        dns_command = "echo '' > /etc/resolv.conf"
         if dns_servers:
             content = "\n".join(f"nameserver {server}" for server in dns_servers)
             args = " ".join(shlex.quote(line) for line in content.splitlines())
-            dns_command = f"printf '%s\\n' {args} | tee /etc/resolv.conf >/dev/null"
-            _run_obs_sudo_command(
-                ssh_client=ssh_client,
-                password=ssh_password,
-                command=dns_command,
-                description="写入 OBS /etc/resolv.conf",
-                stage_logger=stage_logger,
-            )
-            result["dns_updated"] = True
-        else:
-            stage_logger.info(
-                "[deploy_obs] 跳过更新 OBS DNS（未提供服务器）",
-                progress_extra={"ip": vm_ip},
-            )
-            result["dns_updated"] = False
+            dns_command += f" && printf '%s\\n' {args} >> /etc/resolv.conf"
+        _run_obs_sudo_command(
+            ssh_client=ssh_client,
+            password=ssh_password,
+            command=dns_command,
+            description="清除并写入 OBS /etc/resolv.conf",
+            stage_logger=stage_logger,
+        )
+        result["dns_updated"] = True
+    except Exception as exc:
+        stage_logger.warning(
+            "[deploy_obs] OBS DNS 更新失败",
+            progress_extra={"error": str(exc), "ip": vm_ip},
+        )
+        result["dns_updated"] = False
 
         restart_cmd = "ids=$(nerdctl ps --format '{{.ID}} {{.Names}}' | awk '/launcher/{print $1}'); "
         restart_cmd += "if [ -n \"$ids\" ]; then nerdctl restart $ids; else echo 'no launcher containers'; fi"

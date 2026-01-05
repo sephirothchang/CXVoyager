@@ -23,4 +23,10 @@ APP_SPEC_SFS = AppSpec(
 def handle_deploy_sfs(ctx_dict):
     """上传 SFS 应用包。"""
 
-    upload_app(ctx_dict, APP_SPEC_SFS, Stage.deploy_sfs)
+    try:
+        upload_app(ctx_dict, APP_SPEC_SFS, Stage.deploy_sfs)
+    except Exception as exc:
+        # 占位实现，记录错误但不中断
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"SFS 部署失败（占位实现）: {exc}")

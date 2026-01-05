@@ -395,6 +395,7 @@ def handle_deploy_cloudtower(ctx_dict):
 
         raise_if_aborted(ctx_dict, stage_logger=stage_logger, hint="部署 CloudTower 服务")
         _install_and_verify_cloudtower_services(
+            ctx=ctx,
             deployment_plan=deployment_plan,
             stage_logger=stage_logger,
         )
@@ -1832,6 +1833,7 @@ def _extract_data_list(response: Any) -> List[Dict[str, Any]]:
 
 def _install_and_verify_cloudtower_services(
     *,
+    ctx: RunContext,
     deployment_plan: CloudTowerDeploymentPlan,
     stage_logger: LoggerAdapter,
 ) -> None:
@@ -1887,6 +1889,27 @@ def _install_and_verify_cloudtower_services(
             description="创建 DNS 解析文件",
             stage_logger=stage_logger,
         )
+
+        # Configure DNS servers in resolv.conf
+        dns_servers = _extract_dns_servers(ctx, stage_logger)
+        if dns_servers:
+            dns_commands = ["echo '# DNS servers configured by CXVoyager AutoDeploy Platform' >> /etc/resolv.conf"]
+            for dns in dns_servers:
+                dns_commands.append(f"echo 'nameserver {dns}' >> /etc/resolv.conf")
+            full_dns_command = " && ".join(dns_commands)
+            try:
+                _run_sudo_command(
+                    ssh_client=ssh_client,
+                    ssh_config=deployment_plan.ssh,
+                    command=full_dns_command,
+                    description="配置 DNS 服务器",
+                    stage_logger=stage_logger,
+                )
+            except Exception as exc:
+                stage_logger.warning(
+                    "配置 DNS 服务器失败，继续安装",
+                    progress_extra={"error": str(exc)},
+                )
 
         _run_sudo_command(
             ssh_client=ssh_client,
@@ -2344,7 +2367,26 @@ def _resolve_cloudtower_setup_inputs(
     )
 
 
-def _extract_mgmt_value(parsed_plan: Any, key: str) -> Any:
+def _extract_dns_servers(ctx: RunContext, stage_logger: LoggerAdapter) -> List[str]:
+    """从规划表或配置中提取 DNS 服务器列表。"""
+    plan = ctx.plan
+    parsed_plan = ctx.extra.get('parsed_plan') if isinstance(ctx.extra, dict) else None
+    config_data = ctx.extra.get('config') if isinstance(ctx.extra, dict) else {}
+    cloud_cfg = dict(config_data.get("cloudtower", {}) or {})
+
+    mgmt_model = getattr(plan, "mgmt", None)
+    dns_servers = _normalize_server_list(
+        getattr(mgmt_model, "DNS服务器", None)
+        or _extract_mgmt_value(parsed_plan, "DNS 服务器")
+        or cloud_cfg.get("dns_servers")
+        or CLOUDTOWER_DEFAULT_DNS_SERVERS
+    )
+
+    stage_logger.debug(
+        "提取 DNS 服务器",
+        progress_extra={"dns_servers": dns_servers},
+    )
+    return dns_servers
     if not isinstance(parsed_plan, dict):
         return None
     mgmt = parsed_plan.get("mgmt")

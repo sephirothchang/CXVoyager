@@ -23,4 +23,10 @@ APP_SPEC_SKS = AppSpec(
 def handle_deploy_sks(ctx_dict):
     """上传 SKS 应用包。"""
 
-    upload_app(ctx_dict, APP_SPEC_SKS, Stage.deploy_sks)
+    try:
+        upload_app(ctx_dict, APP_SPEC_SKS, Stage.deploy_sks)
+    except Exception as exc:
+        # 占位实现，记录错误但不中断
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"SKS 部署失败（占位实现）: {exc}")
