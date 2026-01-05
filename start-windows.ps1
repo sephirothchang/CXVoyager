@@ -7,6 +7,12 @@ $reqFile = Join-Path $scriptDir "requirements.txt"
 $offlineDir = Join-Path $scriptDir "cxvoyager\common\resources\offline_packages"
 $stampFile = Join-Path $venvDir ".requirements.sha256"
 
+# Prepare offline packages if needed
+if (-not (Test-Path $offlineDir) -or -not (Get-ChildItem -Path $offlineDir -File -ErrorAction SilentlyContinue | Select-Object -First 1)) {
+	Write-Host "准备离线安装包..."
+	python "$scriptDir\scripts\prepare_offline_installation_packages.py"
+}
+
 function Install-Requirements {
 	if (-not (Test-Path $reqFile)) {
 		return

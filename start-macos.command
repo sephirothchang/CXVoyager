@@ -8,6 +8,12 @@ REQ_FILE="$SCRIPT_DIR/requirements.txt"
 OFFLINE_DIR="$SCRIPT_DIR/cxvoyager/common/resources/offline_packages"
 REQ_STAMP="$VENV_DIR/.requirements.sha256"
 
+# Prepare offline packages if needed
+if [ ! -d "$OFFLINE_DIR" ] || [ -z "$(ls -A "$OFFLINE_DIR" 2>/dev/null)" ]; then
+  echo "准备离线安装包..."
+  python3 "$SCRIPT_DIR/scripts/prepare_offline_installation_packages.py"
+fi
+
 install_requirements() {
   if [ ! -f "$REQ_FILE" ]; then
     return
