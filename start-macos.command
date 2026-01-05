@@ -14,7 +14,7 @@ install_requirements() {
   fi
 
   local cur_hash
-  cur_hash=$(sha256sum "$REQ_FILE" | awk '{print $1}')
+  cur_hash=$(shasum -a 256 "$REQ_FILE" | awk '{print $1}')
 
   if [ -f "$REQ_STAMP" ]; then
     local saved_hash

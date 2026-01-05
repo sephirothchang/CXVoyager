@@ -15,6 +15,7 @@
 
 ## 待支持功能
 
+- [ ] cloudtower 的 DNS 配置功能支持
 - [ ] [接口示例文件/API接口及示例.md#L2206-L2207](接口示例文件/API接口及示例.md#L2206-L2207) | [cxvoyager/core/deployment/handlers/deploy_cloudtower.py](cxvoyager/core/deployment/handlers/deploy_cloudtower.py) CloudTower 机架拓扑配置：读取机架表并调用 CloudTower 接口自动化配置。
 - [ ] [cxvoyager/core/deployment/handlers/deploy_obs.py](cxvoyager/core/deployment/handlers/deploy_obs.py) OBS 开启网络流量可视化功能；执行后将序列号回写规划表。
 - [ ] [cxvoyager/core/deployment/handlers/deploy_bak.py](cxvoyager/core/deployment/handlers/deploy_bak.py) 备份阶段：序列号写回到规划表。
